@@ -1,5 +1,6 @@
 const Book = require('../models/Book');
 const Notification = require('../models/Notification');
+const path = require('path');
 
 exports.getBooks = async (req, res) => {
   try {
@@ -38,7 +39,20 @@ exports.getBook = async (req, res) => {
 exports.createBook = async (req, res) => {
   try {
     const { title, author, category, condition, description, location, isbn, language, pages, tags } = req.body;
-    const image = req.file ? req.file.path : '';
+    let image = '';
+    if (req.file) {
+      // Cloudinary provides a URL-like `path`; disk storage provides a filesystem path.
+      const filePath = String(req.file.path || '');
+      const normalized = filePath.replace(/\\/g, '/');
+      if (/^https?:\/\//i.test(normalized)) {
+        image = normalized;
+      } else {
+        // Convert ".../backend/uploads/books/abc.png" OR "uploads/books/abc.png" to "/uploads/books/abc.png"
+        const idx = normalized.lastIndexOf('/uploads/');
+        const rel = idx >= 0 ? normalized.slice(idx) : `/uploads/${path.basename(normalized)}`;
+        image = `${req.protocol}://${req.get('host')}${rel}`;
+      }
+    }
 
     const book = await Book.create({
       title, author, category, condition, description,
