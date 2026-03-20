@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { BookOpen, MapPin, User, MessageCircle, Heart, ArrowLeft, ShieldCheck, Clock3, BadgeCheck } from 'lucide-react'
+import { BookOpen, MapPin, User, MessageCircle, Heart, ArrowLeft, ShieldCheck, Clock3, BadgeCheck, PenSquare } from 'lucide-react'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import api from '@/lib/api'
@@ -11,29 +11,60 @@ import { cn, getConditionColor, getStatusColor, formatDate, formatRating } from 
 import Link from 'next/link'
 import StarDisplay from '@/components/reviews/StarDisplay'
 import ReviewCard from '@/components/reviews/ReviewCard'
+import ReviewForm from '@/components/reviews/ReviewForm'
+
+const emptyReviewsState = {
+  reviews: [],
+  myReview: null,
+  summary: {
+    bookRatingAverage: 0,
+    reviewsCount: 0,
+  },
+  total: 0,
+  page: 1,
+  pages: 1,
+}
 
 export default function BookDetailPage() {
   const { id } = useParams()
   const router = useRouter()
-  const { user } = useAuthStore()
+  const { user, token } = useAuthStore()
   const [book, setBook] = useState<any>(null)
-  const [reviewsData, setReviewsData] = useState<any>({ reviews: [], summary: { reviewsCount: 0 } })
+  const [reviewsData, setReviewsData] = useState<any>(emptyReviewsState)
   const [loading, setLoading] = useState(true)
+  const [reviewsLoading, setReviewsLoading] = useState(false)
   const [requesting, setRequesting] = useState(false)
   const [requestMsg, setRequestMsg] = useState('')
   const [showRequestForm, setShowRequestForm] = useState(false)
+  const [showPublicReviewForm, setShowPublicReviewForm] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
 
+  const fetchBook = async () => {
+    const { data } = await api.get(`/books/${id}`)
+    setBook(data)
+    return data
+  }
+
+  const fetchReviews = async () => {
+    if (!token) {
+      setReviewsData(emptyReviewsState)
+      return
+    }
+
+    setReviewsLoading(true)
+    try {
+      const { data } = await api.get(`/reviews/public/book/${id}`)
+      setReviewsData(data)
+    } finally {
+      setReviewsLoading(false)
+    }
+  }
+
   useEffect(() => {
-    const fetchBook = async () => {
+    const load = async () => {
       try {
-        const [bookRes, reviewsRes] = await Promise.all([
-          api.get(`/books/${id}`),
-          api.get(`/reviews/book/${id}`),
-        ])
-        setBook(bookRes.data)
-        setReviewsData(reviewsRes.data)
+        await fetchBook()
       } catch {
         router.push('/books')
       } finally {
@@ -41,23 +72,61 @@ export default function BookDetailPage() {
       }
     }
 
-    fetchBook()
+    load()
   }, [id, router])
+
+  useEffect(() => {
+    fetchReviews().catch(() => setReviewsData(emptyReviewsState))
+  }, [id, token])
 
   const handleRequest = async () => {
     if (!user) return router.push('/auth/login')
     setRequesting(true)
     setError('')
+    setSuccess('')
     try {
       await api.post('/requests', { bookId: id, message: requestMsg })
-      setSuccess('Request sent successfully! The donor will review it soon.')
+      setSuccess('Request sent successfully.')
       setShowRequestForm(false)
-      const { data } = await api.get(`/books/${id}`)
-      setBook(data)
+      await fetchBook()
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to send request')
     } finally {
       setRequesting(false)
+    }
+  }
+
+  const handlePublicReviewSubmit = async (payload: any) => {
+    try {
+      if (reviewsData.myReview?._id) {
+        await api.put(`/reviews/${reviewsData.myReview._id}`, payload)
+        setSuccess('Your public review was updated successfully.')
+      } else {
+        await api.post(`/reviews/public/book/${id}`, payload)
+        setSuccess('Your public review was published successfully.')
+      }
+      setError('')
+      setShowPublicReviewForm(false)
+      await Promise.all([fetchBook(), fetchReviews()])
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Failed to save public review'
+      setError(message)
+      throw new Error(message)
+    }
+  }
+
+  const handleDeletePublicReview = async () => {
+    if (!reviewsData.myReview?._id) return
+    try {
+      await api.delete(`/reviews/${reviewsData.myReview._id}`)
+      setSuccess('Your public review was deleted successfully.')
+      setError('')
+      setShowPublicReviewForm(false)
+      await Promise.all([fetchBook(), fetchReviews()])
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Failed to delete public review'
+      setError(message)
+      throw new Error(message)
     }
   }
 
@@ -85,6 +154,8 @@ export default function BookDetailPage() {
   const isOwner = user?._id === book.donorId?._id
   const canRequest = !!user && !isOwner && book.status === 'available'
   const donorReputation = book.donorId?.donorReputation
+  const averageRating = reviewsData.summary?.bookRatingAverage || book.ratingsAverage || 0
+  const reviewsCount = reviewsData.summary?.reviewsCount || book.ratingsCount || 0
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -114,10 +185,10 @@ export default function BookDetailPage() {
               </div>
               <div className="absolute bottom-4 left-4 right-4 bg-white/90 dark:bg-gray-900/80 backdrop-blur-sm rounded-xl px-4 py-3 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-wider text-gray-400 mb-1">Book rating</p>
+                  <p className="text-xs uppercase tracking-wider text-gray-400 mb-1">Public rating</p>
                   <div className="flex items-center gap-2">
-                    <StarDisplay value={book.ratingsAverage} showValue />
-                    <span className="text-sm text-gray-500">{book.ratingsCount || 0} review{book.ratingsCount === 1 ? '' : 's'}</span>
+                    <StarDisplay value={averageRating} showValue />
+                    <span className="text-sm text-gray-500">{reviewsCount} review{reviewsCount === 1 ? '' : 's'}</span>
                   </div>
                 </div>
                 {donorReputation?.overallScore ? (
@@ -139,8 +210,8 @@ export default function BookDetailPage() {
               <p className="text-xl text-gray-600 dark:text-gray-400">by {book.author}</p>
               <div className="flex flex-wrap items-center gap-3 mt-4">
                 <div className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                  <StarDisplay value={book.ratingsAverage} size="sm" />
-                  <span>{book.ratingsCount ? `${formatRating(book.ratingsAverage)} from ${book.ratingsCount} review${book.ratingsCount === 1 ? '' : 's'}` : 'No reviews yet'}</span>
+                  <StarDisplay value={averageRating} size="sm" />
+                  <span>{reviewsCount ? `${formatRating(averageRating)} from ${reviewsCount} public review${reviewsCount === 1 ? '' : 's'}` : 'No public reviews yet'}</span>
                 </div>
                 {donorReputation?.overallScore ? (
                   <div className="inline-flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full">
@@ -200,7 +271,7 @@ export default function BookDetailPage() {
                         <p className="text-sm font-semibold">Overall</p>
                       </div>
                       <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatRating(donorReputation.overallScore)}</p>
-                      <p className="text-xs text-gray-400 mt-1">Based on receiver feedback and response time</p>
+                      <p className="text-xs text-gray-400 mt-1">Based on private receiver feedback and response time</p>
                     </div>
                     <div className="rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 px-4 py-4">
                       <div className="flex items-center gap-2 text-blue-700 mb-2">
@@ -216,12 +287,12 @@ export default function BookDetailPage() {
                         <p className="text-sm font-semibold">Accuracy</p>
                       </div>
                       <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatRating(donorReputation.accuracyScore)}</p>
-                      <p className="text-xs text-gray-400 mt-1">{donorReputation.totalReviewedDonations || 0} reviewed donation{donorReputation.totalReviewedDonations === 1 ? '' : 's'}</p>
+                      <p className="text-xs text-gray-400 mt-1">{donorReputation.totalReviewedDonations || 0} private review{donorReputation.totalReviewedDonations === 1 ? '' : 's'}</p>
                     </div>
                   </div>
                 ) : (
                   <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700">
-                    This donor is still building their reputation. Once receivers confirm deliveries and leave feedback, their score will appear here.
+                    This donor is still building their reputation. Once receivers confirm deliveries and leave private feedback, their score will appear here.
                   </div>
                 )}
               </div>
@@ -290,31 +361,77 @@ export default function BookDetailPage() {
           </motion.div>
         </div>
 
-        <div className="mt-12">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <div className="mt-12 space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Reader Reviews</h2>
-              <p className="text-gray-500 mt-1">Only students who received the book can leave a review.</p>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Public Reviews</h2>
+              <p className="text-gray-500 mt-1">Signed-in users can publish one public review per book.</p>
             </div>
             <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 min-w-[220px]">
-              <p className="text-xs uppercase tracking-wider text-gray-400 mb-1">Average title rating</p>
+              <p className="text-xs uppercase tracking-wider text-gray-400 mb-1">Average public rating</p>
               <div className="flex items-center gap-3">
-                <StarDisplay value={reviewsData.summary?.bookRatingAverage || book.ratingsAverage} showValue />
-                <span className="text-sm text-gray-500">{reviewsData.summary?.reviewsCount || 0} total</span>
+                <StarDisplay value={averageRating} showValue />
+                <span className="text-sm text-gray-500">{reviewsCount} total</span>
               </div>
             </div>
           </div>
 
-          {reviewsData.reviews?.length ? (
-            <div className="grid gap-4">
-              {reviewsData.reviews.map((review: any) => (
-                <ReviewCard key={review._id} review={review} />
-              ))}
+          {!user ? (
+            <div className="bg-white dark:bg-gray-900 border border-dashed border-gray-200 dark:border-gray-800 rounded-2xl px-6 py-12 text-center text-gray-500">
+              Sign in to view public reviews and add your own rating and comment.
             </div>
           ) : (
-            <div className="bg-white dark:bg-gray-900 border border-dashed border-gray-200 dark:border-gray-800 rounded-2xl px-6 py-12 text-center text-gray-400">
-              No reviews yet for this title. Once a student receives this book, they can leave a star rating and written review.
-            </div>
+            <>
+              <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-gray-900">{reviewsData.myReview ? 'You already reviewed this book' : 'Share your reading experience'}</p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {reviewsData.myReview
+                      ? 'You can edit or delete your public review anytime.'
+                      : 'A public review requires both a star rating and a written comment.'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowPublicReviewForm((prev) => !prev)}
+                  className="inline-flex items-center justify-center gap-2 bg-blue-600 text-white font-semibold px-4 py-2.5 rounded-xl hover:bg-blue-700 transition-colors"
+                >
+                  <PenSquare className="w-4 h-4" />
+                  {showPublicReviewForm
+                    ? 'Hide review form'
+                    : reviewsData.myReview
+                      ? 'Edit your review'
+                      : 'Write a review'}
+                </button>
+              </div>
+
+              {showPublicReviewForm && (
+                <ReviewForm
+                  mode="public"
+                  initialValues={reviewsData.myReview || undefined}
+                  onSubmit={handlePublicReviewSubmit}
+                  onDelete={reviewsData.myReview ? handleDeletePublicReview : undefined}
+                  onCancel={() => setShowPublicReviewForm(false)}
+                  submitLabel={reviewsData.myReview ? 'Update public review' : 'Publish public review'}
+                  deleteLabel="Delete public review"
+                />
+              )}
+
+              {reviewsLoading ? (
+                <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl px-6 py-12 text-center text-gray-400">
+                  Loading public reviews...
+                </div>
+              ) : reviewsData.reviews?.length ? (
+                <div className="grid gap-4">
+                  {reviewsData.reviews.map((review: any) => (
+                    <ReviewCard key={review._id} review={review} />
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-white dark:bg-gray-900 border border-dashed border-gray-200 dark:border-gray-800 rounded-2xl px-6 py-12 text-center text-gray-400">
+                  No public reviews yet for this title. Be the first signed-in reader to rate it.
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
