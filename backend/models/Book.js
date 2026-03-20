@@ -19,6 +19,9 @@ const bookSchema = new mongoose.Schema({
   pages: { type: Number },
   tags: [{ type: String }],
   views: { type: Number, default: 0 },
+  ratingsAverage: { type: Number, default: 0 },
+  ratingsCount: { type: Number, default: 0 },
+  latestReviewAt: { type: Date },
 }, { timestamps: true });
 
 bookSchema.index({ title: 'text', author: 'text', category: 'text', description: 'text' });

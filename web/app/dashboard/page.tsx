@@ -1,31 +1,36 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { BookOpen, Heart, CheckCircle, Clock, Plus, MessageCircle, Bell } from 'lucide-react'
+import { BookOpen, Heart, CheckCircle, Clock, Plus, Bell, Truck, ShieldCheck, Star } from 'lucide-react'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import BookCard from '@/components/books/BookCard'
+import ReviewForm from '@/components/reviews/ReviewForm'
+import StarDisplay from '@/components/reviews/StarDisplay'
 import api from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { cn, getStatusColor, formatDate } from '@/lib/utils'
+import { cn, getStatusColor, formatDate, formatRating } from '@/lib/utils'
 
 export default function DashboardPage() {
-  const { user } = useAuthStore()
+  const { user, fetchMe } = useAuthStore()
   const router = useRouter()
   const [tab, setTab] = useState('overview')
-  const [myBooks, setMyBooks] = useState([])
-  const [myRequests, setMyRequests] = useState([])
-  const [donorRequests, setDonorRequests] = useState([])
-  const [donations, setDonations] = useState([])
-  const [notifications, setNotifications] = useState([])
+  const [myBooks, setMyBooks] = useState<any[]>([])
+  const [myRequests, setMyRequests] = useState<any[]>([])
+  const [donorRequests, setDonorRequests] = useState<any[]>([])
+  const [donations, setDonations] = useState<any[]>([])
+  const [notifications, setNotifications] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [actionMessage, setActionMessage] = useState('')
+  const [actionError, setActionError] = useState('')
+  const [activeReviewDonationId, setActiveReviewDonationId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user) { router.push('/auth/login'); return }
     fetchAll()
-  }, [user])
+  }, [user, router])
 
   const fetchAll = async () => {
     setLoading(true)
@@ -42,22 +47,52 @@ export default function DashboardPage() {
       setDonorRequests(donorReqRes.data)
       setDonations(donRes.data)
       setNotifications(notifRes.data)
-    } catch (err) { console.error(err) }
-    finally { setLoading(false) }
+      await fetchMe()
+    } catch (err) {
+      console.error(err)
+      setActionError('Failed to load dashboard data.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleRequestResponse = async (id: string, status: string) => {
+    setActionError('')
+    setActionMessage('')
     try {
       await api.put(`/requests/${id}/respond`, { status })
+      setActionMessage(`Request ${status} successfully.`)
       fetchAll()
-    } catch (err) { console.error(err) }
+    } catch (err: any) {
+      setActionError(err.response?.data?.message || 'Failed to update request')
+    }
+  }
+
+  const handleDonationStatus = async (id: string, status: string) => {
+    setActionError('')
+    setActionMessage('')
+    try {
+      await api.put(`/donations/${id}/status`, { status })
+      setActionMessage(status === 'delivered' ? 'Donation marked as delivered.' : 'Receipt confirmed successfully.')
+      fetchAll()
+    } catch (err: any) {
+      setActionError(err.response?.data?.message || 'Failed to update donation status')
+    }
+  }
+
+  const handleReviewSubmit = async (donationId: string, payload: { bookRating: number; donorFeedbackRating: number; descriptionAccuracyRating: number; reviewText: string }) => {
+    await api.post(`/reviews/donation/${donationId}`, payload)
+    setActionMessage('Review submitted successfully. The book rating and donor reputation are now updated.')
+    setActionError('')
+    setActiveReviewDonationId(null)
+    await fetchAll()
   }
 
   const stats = [
     { label: 'Books Donated', value: myBooks.length, icon: BookOpen, color: 'bg-blue-50 text-blue-600' },
     { label: 'Requests Sent', value: myRequests.length, icon: Heart, color: 'bg-rose-50 text-rose-600' },
     { label: 'Books Adopted', value: donations.filter((d: any) => d.receiverId?._id === user?._id).length, icon: CheckCircle, color: 'bg-green-50 text-green-600' },
-    { label: 'Pending', value: donorRequests.filter((r: any) => r.status === 'pending').length, icon: Clock, color: 'bg-amber-50 text-amber-600' },
+    { label: 'Reviews Pending', value: donations.filter((d: any) => d.receiverId?._id === user?._id && ['delivered', 'confirmed'].includes(d.status) && !d.reviewId).length, icon: Star, color: 'bg-amber-50 text-amber-600' },
   ]
 
   const tabs = ['overview', 'my-books', 'requests', 'donations', 'notifications']
@@ -66,8 +101,6 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <Navbar />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-
-        {/* Welcome */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -81,7 +114,40 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        {/* Stats */}
+        {!!user?.donorReputation?.overallScore && (
+          <div className="mb-8 bg-white dark:bg-gray-900 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full text-sm font-semibold mb-3">
+                  <ShieldCheck className="w-4 h-4" /> Donor reputation live
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Your current donor score is {formatRating(user.donorReputation.overallScore)} / 5</h2>
+                <p className="text-sm text-gray-500 mt-1">Calculated from response speed, receiver feedback, and how accurately your book descriptions match reality.</p>
+              </div>
+              <div className="grid grid-cols-3 gap-3 text-sm min-w-full md:min-w-[360px]">
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-xl px-3 py-3">
+                  <p className="text-gray-500 mb-1">Response</p>
+                  <p className="font-bold text-gray-900 dark:text-white">{formatRating(user.donorReputation.responseSpeedScore)}</p>
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-xl px-3 py-3">
+                  <p className="text-gray-500 mb-1">Accuracy</p>
+                  <p className="font-bold text-gray-900 dark:text-white">{formatRating(user.donorReputation.accuracyScore)}</p>
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-xl px-3 py-3">
+                  <p className="text-gray-500 mb-1">Feedback</p>
+                  <p className="font-bold text-gray-900 dark:text-white">{formatRating(user.donorReputation.receiverFeedbackScore)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {(actionMessage || actionError) && (
+          <div className={cn('mb-6 rounded-2xl px-4 py-3 text-sm border', actionMessage ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200')}>
+            {actionMessage || actionError}
+          </div>
+        )}
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {stats.map((stat, i) => (
             <motion.div key={stat.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
@@ -95,7 +161,6 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-1 bg-gray-100 dark:bg-gray-900 p-1 rounded-xl mb-8 overflow-x-auto">
           {tabs.map(t => (
             <button key={t} onClick={() => setTab(t)}
@@ -105,14 +170,12 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Content */}
         {loading ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
             {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-60 bg-gray-200 dark:bg-gray-800 rounded-2xl animate-pulse" />)}
           </div>
         ) : (
           <>
-            {/* Overview */}
             {tab === 'overview' && (
               <div className="space-y-8">
                 {donorRequests.filter((r: any) => r.status === 'pending').length > 0 && (
@@ -154,7 +217,6 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* My Books */}
             {tab === 'my-books' && (
               <div>
                 <div className="flex items-center justify-between mb-4">
@@ -175,7 +237,6 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* Requests */}
             {tab === 'requests' && (
               <div className="space-y-8">
                 <div>
@@ -184,7 +245,7 @@ export default function DashboardPage() {
                     <div className="space-y-3">
                       {donorRequests.map((req: any) => (
                         <div key={req._id} className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between gap-4">
                             <div>
                               <p className="font-medium text-gray-900 dark:text-white">
                                 <span className="text-blue-600">{req.requesterId?.name}</span> → {req.bookId?.title}
@@ -192,7 +253,7 @@ export default function DashboardPage() {
                               {req.message && <p className="text-sm text-gray-500 mt-1 italic">"{req.message}"</p>}
                               <p className="text-xs text-gray-400 mt-1">{formatDate(req.requestDate)}</p>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap justify-end">
                               <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full', getStatusColor(req.status))}>{req.status}</span>
                               {req.status === 'pending' && (
                                 <>
@@ -213,7 +274,7 @@ export default function DashboardPage() {
                   {myRequests.length === 0 ? <p className="text-gray-400">You haven't requested any books.</p> : (
                     <div className="space-y-3">
                       {myRequests.map((req: any) => (
-                        <div key={req._id} className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                        <div key={req._id} className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800 flex items-center justify-between gap-4">
                           <div className="flex items-center gap-3">
                             {req.bookId?.image && <img src={req.bookId.image} alt={req.bookId.title} className="w-12 h-16 object-cover rounded-lg" />}
                             <div>
@@ -231,34 +292,90 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* Donations */}
             {tab === 'donations' && (
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Donation History ({donations.length})</h2>
                 {donations.length === 0 ? <p className="text-gray-400 text-center py-16">No donations yet.</p> : (
-                  <div className="space-y-3">
-                    {donations.map((don: any) => (
-                      <div key={don._id} className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium text-gray-900 dark:text-white">{don.bookId?.title}</p>
-                            <p className="text-sm text-gray-500">
-                              {don.donorId?._id === user?._id
-                                ? `Given to ${don.receiverId?.name}`
-                                : `Received from ${don.donorId?.name}`}
-                            </p>
-                            <p className="text-xs text-gray-400 mt-1">{formatDate(don.donationDate)} · {don.deliveryMethod}</p>
+                  <div className="space-y-4">
+                    {donations.map((don: any) => {
+                      const isDonor = don.donorId?._id === user?._id
+                      const isReceiver = don.receiverId?._id === user?._id
+                      const canMarkDelivered = isDonor && don.status === 'pending'
+                      const canConfirmReceipt = isReceiver && don.status === 'delivered'
+                      const canReview = isReceiver && ['delivered', 'confirmed'].includes(don.status) && !don.reviewId
+
+                      return (
+                        <div key={don._id} className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800">
+                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div>
+                              <p className="font-medium text-gray-900 dark:text-white">{don.bookId?.title}</p>
+                              <p className="text-sm text-gray-500">
+                                {isDonor ? `Given to ${don.receiverId?.name}` : `Received from ${don.donorId?.name}`}
+                              </p>
+                              <p className="text-xs text-gray-400 mt-1">{formatDate(don.donationDate)} · {don.deliveryMethod}</p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                              <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full', getStatusColor(don.status))}>{don.status}</span>
+                              {canMarkDelivered && (
+                                <button onClick={() => handleDonationStatus(don._id, 'delivered')} className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">
+                                  <Truck className="w-4 h-4" /> Mark delivered
+                                </button>
+                              )}
+                              {canConfirmReceipt && (
+                                <button onClick={() => handleDonationStatus(don._id, 'confirmed')} className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition-colors">
+                                  <CheckCircle className="w-4 h-4" /> Confirm receipt
+                                </button>
+                              )}
+                              {canReview && (
+                                <button onClick={() => setActiveReviewDonationId(activeReviewDonationId === don._id ? null : don._id)} className="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-100 text-amber-700 text-sm rounded-lg hover:bg-amber-200 transition-colors">
+                                  <Star className="w-4 h-4" /> {activeReviewDonationId === don._id ? 'Hide review form' : 'Leave review'}
+                                </button>
+                              )}
+                            </div>
                           </div>
-                          <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full', getStatusColor(don.status))}>{don.status}</span>
+
+                          {don.reviewId && (
+                            <div className="mt-4 rounded-2xl bg-gray-50 dark:bg-gray-800/70 p-4">
+                              <div className="flex flex-wrap items-center gap-3 justify-between mb-3">
+                                <div>
+                                  <p className="text-sm font-semibold text-gray-900 dark:text-white">Your submitted review</p>
+                                  <p className="text-xs text-gray-400">Added on {formatDate(don.reviewId.createdAt)}</p>
+                                </div>
+                                <StarDisplay value={don.reviewId.bookRating} showValue />
+                              </div>
+                              {don.reviewId.reviewText && (
+                                <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">“{don.reviewId.reviewText}”</p>
+                              )}
+                              <div className="grid sm:grid-cols-2 gap-3 text-sm">
+                                <div className="bg-white dark:bg-gray-900 rounded-xl px-3 py-3">
+                                  <p className="text-gray-500 mb-1">Donor feedback</p>
+                                  <StarDisplay value={don.reviewId.donorFeedbackRating} size="sm" showValue />
+                                </div>
+                                <div className="bg-white dark:bg-gray-900 rounded-xl px-3 py-3">
+                                  <p className="text-gray-500 mb-1">Description accuracy</p>
+                                  <StarDisplay value={don.reviewId.descriptionAccuracyRating} size="sm" showValue />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {activeReviewDonationId === don._id && canReview && (
+                            <div className="mt-4">
+                              <ReviewForm
+                                onSubmit={(payload) => handleReviewSubmit(don._id, payload)}
+                                onCancel={() => setActiveReviewDonationId(null)}
+                                submitLabel="Publish review"
+                              />
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </div>
             )}
 
-            {/* Notifications */}
             {tab === 'notifications' && (
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Notifications</h2>

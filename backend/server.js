@@ -18,19 +18,17 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve locally stored uploads (Cloudinary fallback)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Routes
 app.use('/api', require('./routes/auth'));
 app.use('/api/books', require('./routes/books'));
 app.use('/api/requests', require('./routes/requests'));
 app.use('/api/donations', require('./routes/donations'));
+app.use('/api/reviews', require('./routes/reviews'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/admin', require('./routes/admin'));
 
-// Socket.IO for real-time chat
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
@@ -47,16 +45,14 @@ io.on('connection', (socket) => {
   });
 });
 
-// Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err);
   res.status(err.status || 500).json({ message: err.message || 'Internal Server Error' });
 });
 
-// MongoDB connection
-mongoose.connect(process.env.MONGODB_URI )
+mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('MongoDB connected'))
-  .catch(err => console.error('MongoDB error:', err));
+  .catch((err) => console.error('MongoDB error:', err));
 
-const PORT = process.env.PORT  || 5001;
+const PORT = process.env.PORT || 5001;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));

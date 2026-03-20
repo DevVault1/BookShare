@@ -4,6 +4,17 @@ import axios from 'axios'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'
 
+interface DonorReputation {
+  overallScore?: number
+  responseSpeedScore?: number
+  accuracyScore?: number
+  receiverFeedbackScore?: number
+  totalReviewedDonations?: number
+  respondedRequests?: number
+  avgResponseHours?: number
+  lastCalculatedAt?: string
+}
+
 interface User {
   _id: string
   name: string
@@ -13,6 +24,7 @@ interface User {
   profileImage?: string
   interests?: string[]
   bio?: string
+  donorReputation?: DonorReputation
 }
 
 interface AuthState {
@@ -36,12 +48,12 @@ interface RegisterData {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set: any, get: any) => ({
       user: null,
       token: null,
       isLoading: false,
 
-      login: async (email, password) => {
+      login: async (email: string, password: string) => {
         set({ isLoading: true })
         try {
           const { data } = await axios.post(`${API}/login`, { email, password })
@@ -53,7 +65,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      register: async (formData) => {
+      register: async (formData: RegisterData) => {
         set({ isLoading: true })
         try {
           const { data } = await axios.post(`${API}/register`, formData)
@@ -70,7 +82,7 @@ export const useAuthStore = create<AuthState>()(
         delete axios.defaults.headers.common['Authorization']
       },
 
-      updateUser: (user) => set({ user }),
+      updateUser: (user: User) => set({ user }),
 
       fetchMe: async () => {
         const token = get().token
@@ -84,6 +96,6 @@ export const useAuthStore = create<AuthState>()(
         }
       },
     }),
-    { name: 'auth-store', partialize: (state) => ({ token: state.token, user: state.user }) }
+    { name: 'auth-store', partialize: (state: AuthState) => ({ token: state.token, user: state.user }) }
   )
 )

@@ -2,19 +2,22 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { BookOpen, MapPin, User, Calendar, MessageCircle, Heart, ArrowLeft, Star } from 'lucide-react'
+import { BookOpen, MapPin, User, MessageCircle, Heart, ArrowLeft, ShieldCheck, Clock3, BadgeCheck } from 'lucide-react'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import api from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
-import { cn, getConditionColor, getStatusColor, formatDate } from '@/lib/utils'
+import { cn, getConditionColor, getStatusColor, formatDate, formatRating } from '@/lib/utils'
 import Link from 'next/link'
+import StarDisplay from '@/components/reviews/StarDisplay'
+import ReviewCard from '@/components/reviews/ReviewCard'
 
 export default function BookDetailPage() {
   const { id } = useParams()
   const router = useRouter()
   const { user } = useAuthStore()
   const [book, setBook] = useState<any>(null)
+  const [reviewsData, setReviewsData] = useState<any>({ reviews: [], summary: { reviewsCount: 0 } })
   const [loading, setLoading] = useState(true)
   const [requesting, setRequesting] = useState(false)
   const [requestMsg, setRequestMsg] = useState('')
@@ -23,11 +26,23 @@ export default function BookDetailPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    api.get(`/books/${id}`)
-      .then(({ data }) => setBook(data))
-      .catch(() => router.push('/books'))
-      .finally(() => setLoading(false))
-  }, [id])
+    const fetchBook = async () => {
+      try {
+        const [bookRes, reviewsRes] = await Promise.all([
+          api.get(`/books/${id}`),
+          api.get(`/reviews/book/${id}`),
+        ])
+        setBook(bookRes.data)
+        setReviewsData(reviewsRes.data)
+      } catch {
+        router.push('/books')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchBook()
+  }, [id, router])
 
   const handleRequest = async () => {
     if (!user) return router.push('/auth/login')
@@ -37,6 +52,8 @@ export default function BookDetailPage() {
       await api.post('/requests', { bookId: id, message: requestMsg })
       setSuccess('Request sent successfully! The donor will review it soon.')
       setShowRequestForm(false)
+      const { data } = await api.get(`/books/${id}`)
+      setBook(data)
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to send request')
     } finally {
@@ -66,19 +83,18 @@ export default function BookDetailPage() {
   if (!book) return null
 
   const isOwner = user?._id === book.donorId?._id
-  const canRequest = user && !isOwner && book.status === 'available'
+  const canRequest = !!user && !isOwner && book.status === 'available'
+  const donorReputation = book.donorId?.donorReputation
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <Navbar />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-
         <Link href="/books" className="inline-flex items-center gap-2 text-gray-500 hover:text-blue-600 mb-8 transition-colors">
           <ArrowLeft className="w-4 h-4" /> Back to Books
         </Link>
 
         <div className="grid md:grid-cols-2 gap-10">
-          {/* Book image */}
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
             <div className="relative aspect-[3/4] bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-800 dark:to-gray-700 rounded-2xl overflow-hidden shadow-lg">
               {book.image ? (
@@ -96,15 +112,43 @@ export default function BookDetailPage() {
                   {book.status}
                 </span>
               </div>
+              <div className="absolute bottom-4 left-4 right-4 bg-white/90 dark:bg-gray-900/80 backdrop-blur-sm rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-gray-400 mb-1">Book rating</p>
+                  <div className="flex items-center gap-2">
+                    <StarDisplay value={book.ratingsAverage} showValue />
+                    <span className="text-sm text-gray-500">{book.ratingsCount || 0} review{book.ratingsCount === 1 ? '' : 's'}</span>
+                  </div>
+                </div>
+                {donorReputation?.overallScore ? (
+                  <div className="text-right">
+                    <p className="text-xs uppercase tracking-wider text-gray-400 mb-1">Donor reputation</p>
+                    <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-sm font-semibold">
+                      <ShieldCheck className="w-4 h-4" /> {formatRating(donorReputation.overallScore)} / 5
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </div>
           </motion.div>
 
-          {/* Book details */}
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
             <div>
               <p className="text-blue-600 font-semibold mb-2">{book.category}</p>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{book.title}</h1>
               <p className="text-xl text-gray-600 dark:text-gray-400">by {book.author}</p>
+              <div className="flex flex-wrap items-center gap-3 mt-4">
+                <div className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                  <StarDisplay value={book.ratingsAverage} size="sm" />
+                  <span>{book.ratingsCount ? `${formatRating(book.ratingsAverage)} from ${book.ratingsCount} review${book.ratingsCount === 1 ? '' : 's'}` : 'No reviews yet'}</span>
+                </div>
+                {donorReputation?.overallScore ? (
+                  <div className="inline-flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full">
+                    <ShieldCheck className="w-4 h-4" />
+                    Trusted donor: {formatRating(donorReputation.overallScore)}
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             {book.description && (
@@ -125,29 +169,62 @@ export default function BookDetailPage() {
               ))}
             </div>
 
-            {/* Donor info */}
             {book.donorId && (
-              <div className="flex items-center gap-3 bg-gray-50 dark:bg-gray-900 rounded-xl p-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  {book.donorId.profileImage ? (
-                    <img src={book.donorId.profileImage} alt={book.donorId.name} className="w-12 h-12 rounded-full object-cover" />
-                  ) : (
-                    <User className="w-6 h-6 text-blue-600" />
-                  )}
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 bg-gray-50 dark:bg-gray-900 rounded-xl p-4">
+                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    {book.donorId.profileImage ? (
+                      <img src={book.donorId.profileImage} alt={book.donorId.name} className="w-12 h-12 rounded-full object-cover" />
+                    ) : (
+                      <User className="w-6 h-6 text-blue-600" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400">Donated by</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">{book.donorId.name}</p>
+                    {book.donorId.location && (
+                      <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                        <MapPin className="w-3 h-3" />{book.donorId.location}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-400">Donated by</p>
-                  <p className="font-semibold text-gray-900 dark:text-white">{book.donorId.name}</p>
-                  {book.donorId.location && (
-                    <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                      <MapPin className="w-3 h-3" />{book.donorId.location}
-                    </p>
-                  )}
-                </div>
+
+                {donorReputation?.overallScore ? (
+                  <div className="grid sm:grid-cols-3 gap-3">
+                    <div className="rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 px-4 py-4">
+                      <div className="flex items-center gap-2 text-emerald-700 mb-2">
+                        <ShieldCheck className="w-4 h-4" />
+                        <p className="text-sm font-semibold">Overall</p>
+                      </div>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatRating(donorReputation.overallScore)}</p>
+                      <p className="text-xs text-gray-400 mt-1">Based on receiver feedback and response time</p>
+                    </div>
+                    <div className="rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 px-4 py-4">
+                      <div className="flex items-center gap-2 text-blue-700 mb-2">
+                        <Clock3 className="w-4 h-4" />
+                        <p className="text-sm font-semibold">Response speed</p>
+                      </div>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatRating(donorReputation.responseSpeedScore)}</p>
+                      <p className="text-xs text-gray-400 mt-1">Average reply: {donorReputation.avgResponseHours || 0}h</p>
+                    </div>
+                    <div className="rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 px-4 py-4">
+                      <div className="flex items-center gap-2 text-indigo-700 mb-2">
+                        <BadgeCheck className="w-4 h-4" />
+                        <p className="text-sm font-semibold">Accuracy</p>
+                      </div>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatRating(donorReputation.accuracyScore)}</p>
+                      <p className="text-xs text-gray-400 mt-1">{donorReputation.totalReviewedDonations || 0} reviewed donation{donorReputation.totalReviewedDonations === 1 ? '' : 's'}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700">
+                    This donor is still building their reputation. Once receivers confirm deliveries and leave feedback, their score will appear here.
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Alerts */}
             {success && (
               <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm">
                 {success}
@@ -159,13 +236,12 @@ export default function BookDetailPage() {
               </div>
             )}
 
-            {/* Request form */}
             {showRequestForm && (
               <div className="space-y-3">
                 <textarea
                   placeholder="Tell the donor why you'd like this book (optional)..."
                   value={requestMsg}
-                  onChange={e => setRequestMsg(e.target.value)}
+                  onChange={(e: any) => setRequestMsg(e.target.value)}
                   rows={3}
                   className="w-full border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
@@ -182,7 +258,6 @@ export default function BookDetailPage() {
               </div>
             )}
 
-            {/* Action buttons */}
             {!showRequestForm && !success && (
               <div className="flex gap-3">
                 {canRequest && (
@@ -211,6 +286,34 @@ export default function BookDetailPage() {
               </div>
             )}
           </motion.div>
+        </div>
+
+        <div className="mt-12">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Reader Reviews</h2>
+              <p className="text-gray-500 mt-1">Only students who received the book can leave a review.</p>
+            </div>
+            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 min-w-[220px]">
+              <p className="text-xs uppercase tracking-wider text-gray-400 mb-1">Average title rating</p>
+              <div className="flex items-center gap-3">
+                <StarDisplay value={reviewsData.summary?.bookRatingAverage || book.ratingsAverage} showValue />
+                <span className="text-sm text-gray-500">{reviewsData.summary?.reviewsCount || 0} total</span>
+              </div>
+            </div>
+          </div>
+
+          {reviewsData.reviews?.length ? (
+            <div className="grid gap-4">
+              {reviewsData.reviews.map((review: any) => (
+                <ReviewCard key={review._id} review={review} />
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-gray-900 border border-dashed border-gray-200 dark:border-gray-800 rounded-2xl px-6 py-12 text-center text-gray-400">
+              No reviews yet for this title. Once a student receives this book, they can leave a star rating and written review.
+            </div>
+          )}
         </div>
       </div>
       <Footer />
