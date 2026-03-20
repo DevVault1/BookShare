@@ -1,9 +1,17 @@
 const router = require('express').Router();
-const { sendMessage, getConversation, getConversations } = require('../controllers/messageController');
+const {
+  startConversation,
+  sendMessage,
+  getConversations,
+  getConversationMessages,
+  markConversationRead,
+} = require('../controllers/messageController');
 const { auth } = require('../middleware/auth');
 
+router.post('/conversations/start', auth, startConversation);
+router.get('/conversations', auth, getConversations);
+router.get('/conversations/:conversationId/messages', auth, getConversationMessages);
+router.put('/conversations/:conversationId/read', auth, markConversationRead);
 router.post('/', auth, sendMessage);
-router.get('/', auth, getConversations);
-router.get('/:userId', auth, getConversation);
 
 module.exports = router;

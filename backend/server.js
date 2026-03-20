@@ -3,18 +3,26 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const http = require('http');
+const jwt = require('jsonwebtoken');
 const { Server } = require('socket.io');
 const path = require('path');
+const User = require('./models/User');
+const Conversation = require('./models/Conversation');
+const { setSocketServer } = require('./utils/socket');
+const { normalizeId } = require('./utils/chat');
 
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
+const allowedOrigins = (process.env.CLIENT_URLS || '*').split(',').map((origin) => origin.trim());
 const io = new Server(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] }
+  cors: { origin: allowedOrigins.includes('*') ? '*' : allowedOrigins, methods: ['GET', 'POST'] },
 });
 
-app.use(cors());
+setSocketServer(io);
+
+app.use(cors({ origin: allowedOrigins.includes('*') ? true : allowedOrigins, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -29,19 +37,58 @@ app.use('/api/messages', require('./routes/messages'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/admin', require('./routes/admin'));
 
-io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
+io.use(async (socket, next) => {
+  try {
+    const rawToken = socket.handshake.auth?.token || socket.handshake.headers?.authorization || '';
+    const token = String(rawToken).replace(/^Bearer\s+/i, '');
 
-  socket.on('join_room', (roomId) => {
-    socket.join(roomId);
+    if (!token) {
+      return next(new Error('Authentication required'));
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+    const user = await User.findById(decoded.id).select('_id name role isActive');
+
+    if (!user || !user.isActive) {
+      return next(new Error('User not found or inactive'));
+    }
+
+    socket.user = { id: normalizeId(user._id), name: user.name, role: user.role };
+    next();
+  } catch (error) {
+    next(new Error('Invalid socket token'));
+  }
+});
+
+io.on('connection', (socket) => {
+  socket.join(`user:${socket.user.id}`);
+  console.log(`Socket connected: ${socket.id} for user ${socket.user.id}`);
+
+  socket.on('conversation:join', async (conversationId) => {
+    try {
+      const conversation = await Conversation.findById(conversationId).select('participants');
+      if (!conversation) {
+        return socket.emit('chat:error', { message: 'Conversation not found.' });
+      }
+
+      const isParticipant = conversation.participants.some((participant) => normalizeId(participant) === socket.user.id);
+      if (!isParticipant) {
+        return socket.emit('chat:error', { message: 'You do not have access to this conversation.' });
+      }
+
+      socket.join(`conversation:${conversationId}`);
+      socket.emit('conversation:joined', { conversationId });
+    } catch (error) {
+      socket.emit('chat:error', { message: 'Failed to join conversation room.' });
+    }
   });
 
-  socket.on('send_message', (data) => {
-    io.to(data.room).emit('receive_message', data);
+  socket.on('conversation:leave', (conversationId) => {
+    socket.leave(`conversation:${conversationId}`);
   });
 
   socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
+    console.log(`Socket disconnected: ${socket.id}`);
   });
 });
 

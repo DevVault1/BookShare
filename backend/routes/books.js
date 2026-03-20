@@ -1,6 +1,13 @@
 const router = require('express').Router();
 const {
-  getBooks, getBook, createBook, updateBook, deleteBook, getUserBooks, getRecommendations
+  getBooks,
+  getBook,
+  createBook,
+  updateBook,
+  deleteBook,
+  getUserBooks,
+  getRecommendations,
+  lookupBookByIsbn,
 } = require('../controllers/bookController');
 const { auth } = require('../middleware/auth');
 const { upload } = require('../config/cloudinary');
@@ -8,6 +15,7 @@ const { upload } = require('../config/cloudinary');
 router.get('/', getBooks);
 router.get('/my-books', auth, getUserBooks);
 router.get('/recommendations', auth, getRecommendations);
+router.get('/lookup/isbn/:isbn', lookupBookByIsbn);
 router.get('/:id', getBook);
 router.post('/', auth, upload.single('image'), createBook);
 router.put('/:id', auth, upload.single('image'), updateBook);
