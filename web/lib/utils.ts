@@ -1,5 +1,5 @@
-import { type ClassValue, clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { type ClassValue, clsx } from 'clsx'
+import { twMerge } from 'tailwind-merge'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -30,6 +30,18 @@ export function getStatusColor(status: string) {
     'pending': 'bg-yellow-100 text-yellow-700',
     'approved': 'bg-green-100 text-green-700',
     'rejected': 'bg-red-100 text-red-700',
+    'delivered': 'bg-indigo-100 text-indigo-700',
+    'confirmed': 'bg-emerald-100 text-emerald-700',
   }
   return map[status] || 'bg-gray-100 text-gray-700'
+}
+
+export function formatRating(value?: number | null) {
+  if (!value || value <= 0) return 'New'
+  return value.toFixed(1)
+}
+
+export function getStarFillWidth(value?: number | null) {
+  if (!value || value <= 0) return '0%'
+  return `${Math.max(0, Math.min(100, (value / 5) * 100))}%`
 }

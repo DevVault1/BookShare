@@ -1,5 +1,4 @@
 const Book = require('../models/Book');
-const Notification = require('../models/Notification');
 const path = require('path');
 
 exports.getBooks = async (req, res) => {
@@ -13,8 +12,8 @@ exports.getBooks = async (req, res) => {
 
     const total = await Book.countDocuments(query);
     const books = await Book.find(query)
-      .populate('donorId', 'name profileImage location')
-      .sort({ createdAt: -1 })
+      .populate('donorId', 'name profileImage location donorReputation')
+      .sort({ ratingsAverage: -1, createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(Number(limit));
 
@@ -26,7 +25,7 @@ exports.getBooks = async (req, res) => {
 
 exports.getBook = async (req, res) => {
   try {
-    const book = await Book.findById(req.params.id).populate('donorId', 'name profileImage location email');
+    const book = await Book.findById(req.params.id).populate('donorId', 'name profileImage location email donorReputation');
     if (!book) return res.status(404).json({ message: 'Book not found' });
     book.views += 1;
     await book.save();
@@ -39,21 +38,18 @@ exports.getBook = async (req, res) => {
 exports.createBook = async (req, res) => {
   try {
     const { title, author, category, condition, description, location, isbn, language, pages, tags } = req.body;
-    
-    // Validate required fields
+
     if (!title || !author || !category || !condition) {
       return res.status(400).json({ message: 'Missing required fields: title, author, category, condition' });
     }
 
     let image = '';
     if (req.file) {
-      // Cloudinary provides a URL-like `path`; disk storage provides a filesystem path.
       const filePath = String(req.file.path || '');
       const normalized = filePath.replace(/\\/g, '/');
       if (/^https?:\/\//i.test(normalized)) {
         image = normalized;
       } else {
-        // Convert ".../backend/uploads/books/abc.png" OR "uploads/books/abc.png" to "/uploads/books/abc.png"
         const idx = normalized.lastIndexOf('/uploads/');
         const rel = idx >= 0 ? normalized.slice(idx) : `/uploads/${path.basename(normalized)}`;
         image = `${req.protocol}://${req.get('host')}${rel}`;
@@ -63,13 +59,12 @@ exports.createBook = async (req, res) => {
     const bookData = {
       title, author, category, condition, description,
       location: location || req.user.location,
-      isbn, language, 
-      tags: tags ? tags.split(',').map(t => t.trim()) : [],
+      isbn, language,
+      tags: tags ? tags.split(',').map((t) => t.trim()) : [],
       image,
       donorId: req.user._id,
     };
 
-    // Only add pages if it's provided and valid
     if (pages && pages !== '') {
       bookData.pages = Number(pages);
     }
@@ -130,8 +125,8 @@ exports.getRecommendations = async (req, res) => {
       : { status: 'available' };
 
     const books = await Book.find(query)
-      .populate('donorId', 'name profileImage location')
-      .sort({ views: -1, createdAt: -1 })
+      .populate('donorId', 'name profileImage location donorReputation')
+      .sort({ ratingsAverage: -1, views: -1, createdAt: -1 })
       .limit(8);
 
     res.json(books);

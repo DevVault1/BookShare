@@ -4,7 +4,7 @@ const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api',
 })
 
-api.interceptors.request.use((config) => {
+api.interceptors.request.use((config: any) => {
   if (typeof window !== 'undefined') {
     const stored = localStorage.getItem('auth-store')
     if (stored) {
@@ -17,8 +17,8 @@ api.interceptors.request.use((config) => {
 })
 
 api.interceptors.response.use(
-  (res) => res,
-  (err) => {
+  (res: any) => res,
+  (err: any) => {
     if (err.response?.status === 401 && typeof window !== 'undefined') {
       localStorage.removeItem('auth-store')
       window.location.href = '/auth/login'
