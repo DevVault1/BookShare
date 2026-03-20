@@ -160,7 +160,9 @@ export default function BookDetailPage() {
                 { label: 'Language', value: book.language || 'English' },
                 { label: 'Pages', value: book.pages || 'N/A' },
                 { label: 'ISBN', value: book.isbn || 'N/A' },
+                { label: 'Published', value: book.publishedYear || 'N/A' },
                 { label: 'Listed', value: formatDate(book.createdAt) },
+                { label: 'Metadata', value: book.metadataSource ? String(book.metadataSource).replace(/_/g, ' ') : 'Manual entry' },
               ].map(({ label, value }) => (
                 <div key={label}>
                   <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">{label}</p>
@@ -267,7 +269,7 @@ export default function BookDetailPage() {
                   </button>
                 )}
                 {user && !isOwner && (
-                  <Link href={`/dashboard/chat?userId=${book.donorId?._id}`}
+                  <Link href={`/dashboard/chat?userId=${book.donorId?._id}&bookId=${book._id}`}
                     className="flex-1 inline-flex items-center justify-center gap-2 border-2 border-blue-600 text-blue-600 font-semibold py-3 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
                     <MessageCircle className="w-5 h-5" /> Message Donor
                   </Link>

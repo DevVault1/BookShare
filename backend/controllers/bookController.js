@@ -1,5 +1,6 @@
 const Book = require('../models/Book');
 const path = require('path');
+const { enrichBookDataFromIsbn, lookupBookMetadataByIsbn, isValidHttpUrl, normalizeIsbn } = require('../utils/bookMetadata');
 
 exports.getBooks = async (req, res) => {
   try {
@@ -35,13 +36,31 @@ exports.getBook = async (req, res) => {
   }
 };
 
+exports.lookupBookByIsbn = async (req, res) => {
+  try {
+    const metadata = await lookupBookMetadataByIsbn(req.params.isbn || req.query.isbn || '');
+    res.json(metadata);
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message, details: err.details || [] });
+  }
+};
+
 exports.createBook = async (req, res) => {
   try {
-    const { title, author, category, condition, description, location, isbn, language, pages, tags } = req.body;
-
-    if (!title || !author || !category || !condition) {
-      return res.status(400).json({ message: 'Missing required fields: title, author, category, condition' });
-    }
+    const {
+      title,
+      author,
+      category,
+      condition,
+      description,
+      location,
+      isbn,
+      language,
+      pages,
+      tags,
+      publishedYear,
+      externalImageUrl,
+    } = req.body;
 
     let image = '';
     if (req.file) {
@@ -54,19 +73,42 @@ exports.createBook = async (req, res) => {
         const rel = idx >= 0 ? normalized.slice(idx) : `/uploads/${path.basename(normalized)}`;
         image = `${req.protocol}://${req.get('host')}${rel}`;
       }
+    } else if (isValidHttpUrl(externalImageUrl || '')) {
+      image = externalImageUrl;
     }
 
-    const bookData = {
-      title, author, category, condition, description,
+    let bookData = {
+      title,
+      author,
+      category,
+      condition,
+      description,
       location: location || req.user.location,
-      isbn, language,
-      tags: tags ? tags.split(',').map((t) => t.trim()) : [],
+      isbn: normalizeIsbn(isbn || ''),
+      language,
+      tags: tags ? tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
       image,
       donorId: req.user._id,
+      metadataSource: image ? '' : 'manual',
     };
 
     if (pages && pages !== '') {
       bookData.pages = Number(pages);
+    }
+    if (publishedYear && publishedYear !== '') {
+      bookData.publishedYear = Number(publishedYear);
+    }
+
+    if (bookData.isbn) {
+      try {
+        bookData = await enrichBookDataFromIsbn(bookData, { overwrite: false });
+      } catch (lookupError) {
+        console.warn('ISBN lookup during createBook failed:', lookupError.message);
+      }
+    }
+
+    if (!bookData.title || !bookData.author || !bookData.category || !bookData.condition) {
+      return res.status(400).json({ message: 'Missing required fields: title, author, category, condition' });
     }
 
     const book = await Book.create(bookData);
@@ -85,8 +127,17 @@ exports.updateBook = async (req, res) => {
     if (book.donorId.toString() !== req.user._id.toString() && req.user.role !== 'admin')
       return res.status(403).json({ message: 'Not authorized' });
 
-    const updates = req.body;
-    if (req.file) updates.image = req.file.path;
+    const updates = { ...req.body };
+    if (updates.isbn) updates.isbn = normalizeIsbn(updates.isbn);
+    if (req.file) {
+      const normalized = String(req.file.path || '').replace(/\\/g, '/');
+      updates.image = /^https?:\/\//i.test(normalized)
+        ? normalized
+        : `${req.protocol}://${req.get('host')}${normalized.lastIndexOf('/uploads/') >= 0 ? normalized.slice(normalized.lastIndexOf('/uploads/')) : `/uploads/${path.basename(normalized)}`}`;
+    } else if (isValidHttpUrl(updates.externalImageUrl || '')) {
+      updates.image = updates.externalImageUrl;
+    }
+    delete updates.externalImageUrl;
     const updated = await Book.findByIdAndUpdate(req.params.id, updates, { new: true });
     res.json(updated);
   } catch (err) {

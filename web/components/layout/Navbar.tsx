@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { BookOpen, Menu, X, Bell, User, LogOut, LayoutDashboard } from 'lucide-react'
+import { BookOpen, Menu, X, Bell, User, LogOut, LayoutDashboard, MessageCircle } from 'lucide-react'
 import { useAuthStore } from '@/lib/store/authStore'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -39,7 +39,10 @@ export default function Navbar() {
                   <Link href="/admin" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 font-medium transition-colors">Admin</Link>
                 )}
                 <div className="flex items-center gap-3 ml-4">
-                  <Link href="/dashboard/notifications" className="text-gray-500 hover:text-blue-600 transition-colors">
+                  <Link href="/dashboard/chat" className="text-gray-500 hover:text-blue-600 transition-colors" aria-label="Messages">
+                    <MessageCircle className="w-5 h-5" />
+                  </Link>
+                  <Link href="/dashboard/notifications" className="text-gray-500 hover:text-blue-600 transition-colors" aria-label="Notifications">
                     <Bell className="w-5 h-5" />
                   </Link>
                   <div className="flex items-center gap-2">
