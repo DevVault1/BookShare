@@ -27,7 +27,7 @@ const storage = hasCloudinary
   ? new CloudinaryStorage({
       cloudinary,
       params: {
-        folder: 'adopt-a-book',
+        folder: 'adopt_a_book',
         allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
         transformation: [{ width: 800, height: 600, crop: 'limit' }],
       },

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import axios from 'axios'
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'
 
 interface User {
   _id: string

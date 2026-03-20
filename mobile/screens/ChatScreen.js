@@ -18,7 +18,7 @@ export default function ChatScreen() {
   const flatListRef = useRef(null)
 
   useEffect(() => {
-    socketRef.current = io('http://localhost:5000')
+    socketRef.current = io('http://localhost:5001')
     fetchConversations()
     return () => socketRef.current?.disconnect()
   }, [])
