@@ -80,12 +80,35 @@ export default function DashboardPage() {
     }
   }
 
-  const handleReviewSubmit = async (donationId: string, payload: { bookRating: number; donorFeedbackRating: number; descriptionAccuracyRating: number; reviewText: string }) => {
-    await api.post(`/reviews/donation/${donationId}`, payload)
-    setActionMessage('Review submitted successfully. The book rating and donor reputation are now updated.')
-    setActionError('')
-    setActiveReviewDonationId(null)
-    await fetchAll()
+  const handleReviewSubmit = async (donationId: string, payload: { bookRating: number; donorFeedbackRating: number; descriptionAccuracyRating: number; reviewText: string }, existingReviewId?: string) => {
+    try {
+      if (existingReviewId) {
+        await api.put(`/reviews/${existingReviewId}`, payload)
+        setActionMessage('Private review updated successfully.')
+      } else {
+        await api.post(`/reviews/donation/${donationId}`, payload)
+        setActionMessage('Private review submitted successfully.')
+      }
+      setActionError('')
+      setActiveReviewDonationId(null)
+      await fetchAll()
+    } catch (err: any) {
+      setActionError(err.response?.data?.message || 'Failed to save review')
+      throw new Error(err.response?.data?.message || 'Failed to save review')
+    }
+  }
+
+  const handleDeleteReview = async (reviewId: string) => {
+    try {
+      await api.delete(`/reviews/${reviewId}`)
+      setActionMessage('Private review deleted successfully.')
+      setActionError('')
+      setActiveReviewDonationId(null)
+      await fetchAll()
+    } catch (err: any) {
+      setActionError(err.response?.data?.message || 'Failed to delete review')
+      throw new Error(err.response?.data?.message || 'Failed to delete review')
+    }
   }
 
   const stats = [
@@ -302,7 +325,7 @@ export default function DashboardPage() {
                       const isReceiver = don.receiverId?._id === user?._id
                       const canMarkDelivered = isDonor && don.status === 'pending'
                       const canConfirmReceipt = isReceiver && don.status === 'delivered'
-                      const canReview = isReceiver && ['delivered', 'confirmed'].includes(don.status) && !don.reviewId
+                      const canManagePrivateReview = isReceiver && ['delivered', 'confirmed'].includes(don.status)
 
                       return (
                         <div key={don._id} className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800">
@@ -326,9 +349,9 @@ export default function DashboardPage() {
                                   <CheckCircle className="w-4 h-4" /> Confirm receipt
                                 </button>
                               )}
-                              {canReview && (
+                              {canManagePrivateReview && (
                                 <button onClick={() => setActiveReviewDonationId(activeReviewDonationId === don._id ? null : don._id)} className="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-100 text-amber-700 text-sm rounded-lg hover:bg-amber-200 transition-colors">
-                                  <Star className="w-4 h-4" /> {activeReviewDonationId === don._id ? 'Hide review form' : 'Leave review'}
+                                  <Star className="w-4 h-4" /> {activeReviewDonationId === don._id ? 'Hide review form' : don.reviewId ? 'Edit private review' : 'Leave private review'}
                                 </button>
                               )}
                             </div>
@@ -356,15 +379,29 @@ export default function DashboardPage() {
                                   <StarDisplay value={don.reviewId.descriptionAccuracyRating} size="sm" showValue />
                                 </div>
                               </div>
+                              {isReceiver && (
+                                <div className="flex flex-wrap gap-2 mt-3">
+                                  <button
+                                    onClick={() => setActiveReviewDonationId(activeReviewDonationId === don._id ? null : don._id)}
+                                    className="px-3 py-1.5 bg-amber-100 text-amber-700 text-sm rounded-lg hover:bg-amber-200 transition-colors"
+                                  >
+                                    {activeReviewDonationId === don._id ? 'Hide editor' : 'Edit private review'}
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           )}
 
-                          {activeReviewDonationId === don._id && canReview && (
+                          {activeReviewDonationId === don._id && canManagePrivateReview && (
                             <div className="mt-4">
                               <ReviewForm
-                                onSubmit={(payload) => handleReviewSubmit(don._id, payload)}
+                                mode="private"
+                                initialValues={don.reviewId || undefined}
+                                onSubmit={(payload) => handleReviewSubmit(don._id, payload, don.reviewId?._id)}
+                                onDelete={don.reviewId ? () => handleDeleteReview(don.reviewId._id) : undefined}
                                 onCancel={() => setActiveReviewDonationId(null)}
-                                submitLabel="Publish review"
+                                submitLabel={don.reviewId ? 'Update private review' : 'Submit private review'}
+                                deleteLabel="Delete private review"
                               />
                             </div>
                           )}

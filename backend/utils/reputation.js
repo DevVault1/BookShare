@@ -36,7 +36,7 @@ const weightedAverage = (parts) => {
 const recalculateBookRatings = async (bookId) => {
   const normalizedBookId = typeof bookId === 'string' ? new mongoose.Types.ObjectId(bookId) : bookId;
   const [summary] = await Review.aggregate([
-    { $match: { bookId: normalizedBookId } },
+    { $match: { bookId: normalizedBookId, reviewType: 'public' } },
     {
       $group: {
         _id: '$bookId',
@@ -91,7 +91,15 @@ const recalculateDonorReputation = async (donorId) => {
   ]);
 
   const [reviewSummary] = await Review.aggregate([
-    { $match: { donorId } },
+    {
+      $match: {
+        donorId,
+        $or: [
+          { reviewType: 'private' },
+          { reviewType: { $exists: false } },
+        ],
+      },
+    },
     {
       $group: {
         _id: '$donorId',
