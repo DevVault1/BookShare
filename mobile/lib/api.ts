@@ -1,7 +1,7 @@
 import axios from 'axios'
 import * as SecureStore from 'expo-secure-store'
 
-const API_URL = 'http://localhost:5000/api' // Change to your server IP for device testing
+const API_URL = 'http://localhost:5001/api' // Change to your server IP for device testing
 
 const api = axios.create({ baseURL: API_URL })
 

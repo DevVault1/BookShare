@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Adopt A Book",
-    "slug": "adopt-a-book",
+    "slug": "adopt_a_book",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

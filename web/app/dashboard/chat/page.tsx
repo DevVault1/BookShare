@@ -22,7 +22,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!user) return
-    socketRef.current = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000')
+    socketRef.current = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5001')
     fetchConversations()
     return () => socketRef.current?.disconnect()
   }, [user])

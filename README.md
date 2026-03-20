@@ -9,7 +9,7 @@
 ## 📁 Project Structure
 
 ```
-adopt-a-book/
+adopt_a_book/
 ├── backend/          # Node.js + Express API
 │   ├── controllers/  # Route handlers
 │   ├── models/       # MongoDB schemas
@@ -59,8 +59,8 @@ npm run dev
 ### Backend `.env` variables
 
 ```env
-PORT=5000
-MONGODB_URI=mongodb://localhost:27017/adopt-a-book
+PORT=5001
+MONGODB_URI=mongodb://localhost:27017/adopt_a_book
 JWT_SECRET=your_super_secret_key_change_this
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
@@ -69,7 +69,7 @@ CLOUDINARY_API_SECRET=your_api_secret
 
 **Get Cloudinary credentials:** Sign up free at [cloudinary.com](https://cloudinary.com) → Dashboard → copy Cloud Name, API Key, API Secret.
 
-The server runs on **http://localhost:5000**
+The server runs on **http://localhost:5001**
 
 ---
 
@@ -85,8 +85,8 @@ npm run dev
 ### Web `.env.local` variables
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:5000/api
-NEXT_PUBLIC_SOCKET_URL=http://localhost:5000
+NEXT_PUBLIC_API_URL=http://localhost:5001/api
+NEXT_PUBLIC_SOCKET_URL=http://localhost:5001
 ```
 
 The web app runs on **http://localhost:3000**
@@ -111,7 +111,7 @@ npm run ios
 Edit `mobile/lib/api.ts` and change the `API_URL` to your machine's local IP:
 
 ```ts
-const API_URL = 'http://192.168.1.X:5000/api'  // Your local IP
+const API_URL = 'http://192.168.1.X:5001/api'  // Your local IP
 ```
 
 > **Note:** Use your machine's actual local IP (not `localhost`) when testing on physical devices. Use `localhost` for emulators.

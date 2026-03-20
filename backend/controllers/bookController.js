@@ -39,6 +39,12 @@ exports.getBook = async (req, res) => {
 exports.createBook = async (req, res) => {
   try {
     const { title, author, category, condition, description, location, isbn, language, pages, tags } = req.body;
+    
+    // Validate required fields
+    if (!title || !author || !category || !condition) {
+      return res.status(400).json({ message: 'Missing required fields: title, author, category, condition' });
+    }
+
     let image = '';
     if (req.file) {
       // Cloudinary provides a URL-like `path`; disk storage provides a filesystem path.
@@ -54,17 +60,25 @@ exports.createBook = async (req, res) => {
       }
     }
 
-    const book = await Book.create({
+    const bookData = {
       title, author, category, condition, description,
       location: location || req.user.location,
-      isbn, language, pages,
+      isbn, language, 
       tags: tags ? tags.split(',').map(t => t.trim()) : [],
       image,
       donorId: req.user._id,
-    });
+    };
+
+    // Only add pages if it's provided and valid
+    if (pages && pages !== '') {
+      bookData.pages = Number(pages);
+    }
+
+    const book = await Book.create(bookData);
 
     res.status(201).json(book);
   } catch (err) {
+    console.error('Create book error:', err);
     res.status(500).json({ message: err.message });
   }
 };

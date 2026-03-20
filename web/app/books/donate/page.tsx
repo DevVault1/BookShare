@@ -45,8 +45,24 @@ export default function DonatePage() {
     setLoading(true)
     setError('')
     try {
+      // Validate required fields
+      if (!form.title || !form.author || !form.category || !form.condition) {
+        setError('Please fill in all required fields')
+        setLoading(false)
+        return
+      }
+
       const fd = new FormData()
-      Object.entries(form).forEach(([k, v]) => fd.append(k, v))
+      fd.append('title', form.title)
+      fd.append('author', form.author)
+      fd.append('category', form.category)
+      fd.append('condition', form.condition)
+      fd.append('description', form.description || '')
+      fd.append('location', form.location || '')
+      fd.append('isbn', form.isbn || '')
+      fd.append('language', form.language)
+      if (form.pages) fd.append('pages', form.pages)
+      fd.append('tags', form.tags || '')
       if (imageFile) fd.append('image', imageFile)
 
       const { data } = await api.post('/books', fd, { headers: { 'Content-Type': 'multipart/form-data' } })

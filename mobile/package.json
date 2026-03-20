@@ -1,5 +1,5 @@
 {
-  "name": "adopt-a-book-mobile",
+  "name": "adopt_a_book-mobile",
   "version": "1.0.0",
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
