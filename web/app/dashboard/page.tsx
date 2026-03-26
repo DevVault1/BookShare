@@ -1,17 +1,36 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { BookOpen, Heart, CheckCircle, Clock, Plus, Bell, Truck, ShieldCheck, Star } from 'lucide-react'
+import {
+  BookOpen,
+  Heart,
+  CheckCircle,
+  Plus,
+  Bell,
+  Truck,
+  ShieldCheck,
+  Star,
+  BarChart3,
+  Compass,
+  MapPinned,
+  MessageCircle,
+} from 'lucide-react'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import BookCard from '@/components/books/BookCard'
 import ReviewForm from '@/components/reviews/ReviewForm'
 import StarDisplay from '@/components/reviews/StarDisplay'
+import ImpactMap from '@/components/analytics/ImpactMap'
+import TrendBars from '@/components/analytics/TrendBars'
 import api from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { cn, getStatusColor, formatDate, formatRating } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export default function DashboardPage() {
   const { user, fetchMe } = useAuthStore()
@@ -22,31 +41,37 @@ export default function DashboardPage() {
   const [donorRequests, setDonorRequests] = useState<any[]>([])
   const [donations, setDonations] = useState<any[]>([])
   const [notifications, setNotifications] = useState<any[]>([])
+  const [analytics, setAnalytics] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [actionMessage, setActionMessage] = useState('')
   const [actionError, setActionError] = useState('')
   const [activeReviewDonationId, setActiveReviewDonationId] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!user) { router.push('/auth/login'); return }
+    if (!user) {
+      router.push('/auth/login')
+      return
+    }
     fetchAll()
   }, [user, router])
 
   const fetchAll = async () => {
     setLoading(true)
     try {
-      const [booksRes, reqRes, donorReqRes, donRes, notifRes] = await Promise.all([
+      const [booksRes, reqRes, donorReqRes, donRes, notifRes, analyticsRes] = await Promise.all([
         api.get('/books/my-books'),
         api.get('/requests/user'),
         api.get('/requests/donor'),
         api.get('/donations'),
         api.get('/notifications'),
+        api.get('/analytics/me'),
       ])
       setMyBooks(booksRes.data)
       setMyRequests(reqRes.data)
       setDonorRequests(donorReqRes.data)
       setDonations(donRes.data)
       setNotifications(notifRes.data)
+      setAnalytics(analyticsRes.data)
       await fetchMe()
     } catch (err) {
       console.error(err)
@@ -80,7 +105,11 @@ export default function DashboardPage() {
     }
   }
 
-  const handleReviewSubmit = async (donationId: string, payload: { bookRating: number; donorFeedbackRating: number; descriptionAccuracyRating: number; reviewText: string }, existingReviewId?: string) => {
+  const handleReviewSubmit = async (
+    donationId: string,
+    payload: { bookRating: number; donorFeedbackRating: number; descriptionAccuracyRating: number; reviewText: string },
+    existingReviewId?: string,
+  ) => {
     try {
       if (existingReviewId) {
         await api.put(`/reviews/${existingReviewId}`, payload)
@@ -111,6 +140,30 @@ export default function DashboardPage() {
     }
   }
 
+  if (!user) return null
+
+  const studentAnalytics = analytics?.studentReadingAnalytics || {
+    totalAdoptedBooks: 0,
+    adoptedThisYear: 0,
+    adoptedThisMonth: 0,
+    favouriteCategory: 'Still exploring',
+    categoryBreakdown: [],
+    topAuthors: [],
+    monthlyTrend: [],
+    recentBooks: [],
+  }
+  const donorAnalytics = analytics?.donorImpactAnalytics || {
+    totalBooksShared: 0,
+    studentsReached: 0,
+    citiesReached: 0,
+    favouriteSharedCategory: 'No completed shares yet',
+    cityBreakdown: [],
+    categoryBreakdown: [],
+    monthlyTrend: [],
+    impactMap: [],
+    recentRecipients: [],
+  }
+
   const stats = [
     { label: 'Books Donated', value: myBooks.length, icon: BookOpen, color: 'bg-blue-50 text-blue-600' },
     { label: 'Requests Sent', value: myRequests.length, icon: Heart, color: 'bg-rose-50 text-rose-600' },
@@ -118,7 +171,8 @@ export default function DashboardPage() {
     { label: 'Reviews Pending', value: donations.filter((d: any) => d.receiverId?._id === user?._id && ['delivered', 'confirmed'].includes(d.status) && !d.reviewId).length, icon: Star, color: 'bg-amber-50 text-amber-600' },
   ]
 
-  const tabs = ['overview', 'my-books', 'requests', 'donations', 'notifications']
+  const tabs = ['overview', 'analytics', 'my-books', 'requests', 'donations', 'notifications']
+  const unreadNotifications = notifications.filter((n: any) => !n.isRead).length
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -126,24 +180,30 @@ export default function DashboardPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Hello, {user?.name?.split(' ')[0]}! 👋
-            </h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Hello, {user?.name?.split(' ')[0]}! 👋</h1>
             <p className="text-gray-500 mt-1 capitalize">{user?.role} account · {user?.location || 'No location set'}</p>
           </div>
-          <Link href="/books/donate"
-            className="inline-flex items-center gap-2 bg-blue-600 text-white font-semibold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors">
-            <Plus className="w-4 h-4" /> Donate a Book
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <Button asChild variant="outline" className="rounded-xl">
+              <Link href="/dashboard/chat">
+                <MessageCircle className="mr-2 h-4 w-4" /> Chat
+              </Link>
+            </Button>
+            <Button asChild className="rounded-xl">
+              <Link href="/books/donate">
+                <Plus className="mr-2 h-4 w-4" /> Donate a Book
+              </Link>
+            </Button>
+          </div>
         </div>
 
         {!!user?.donorReputation?.overallScore && (
           <div className="mb-8 bg-white dark:bg-gray-900 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
-                <div className="inline-flex items-center gap-2 text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full text-sm font-semibold mb-3">
-                  <ShieldCheck className="w-4 h-4" /> Donor reputation live
-                </div>
+                <Badge variant="secondary" className="mb-3 inline-flex gap-2 bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+                  <ShieldCheck className="h-4 w-4" /> Donor reputation live
+                </Badge>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">Your current donor score is {formatRating(user.donorReputation.overallScore)} / 5</h2>
                 <p className="text-sm text-gray-500 mt-1">Calculated from response speed, receiver feedback, and how accurately your book descriptions match reality.</p>
               </div>
@@ -171,27 +231,36 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 gap-4 mb-8 md:grid-cols-4">
           {stats.map((stat, i) => (
-            <motion.div key={stat.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-              className="bg-white dark:bg-gray-900 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
-              <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center mb-3', stat.color)}>
-                <stat.icon className="w-5 h-5" />
-              </div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">{stat.value}</div>
-              <div className="text-sm text-gray-500 mt-0.5">{stat.label}</div>
+            <motion.div key={stat.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+              <Card className="rounded-2xl">
+                <CardHeader className="pb-3">
+                  <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl', stat.color)}>
+                    <stat.icon className="h-5 w-5" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">{stat.value}</div>
+                  <div className="mt-0.5 text-sm text-gray-500">{stat.label}</div>
+                </CardContent>
+              </Card>
             </motion.div>
           ))}
         </div>
 
-        <div className="flex gap-1 bg-gray-100 dark:bg-gray-900 p-1 rounded-xl mb-8 overflow-x-auto">
-          {tabs.map(t => (
-            <button key={t} onClick={() => setTab(t)}
-              className={cn('px-4 py-2 rounded-lg text-sm font-medium capitalize whitespace-nowrap transition-colors', tab === t ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300')}>
-              {t.replace('-', ' ')}
-            </button>
-          ))}
-        </div>
+        <Tabs value={tab} onValueChange={setTab} className="mb-8">
+          <TabsList className="h-auto flex-wrap justify-start gap-1 rounded-xl p-1">
+            {tabs.map((t) => (
+              <TabsTrigger key={t} value={t} className="capitalize">
+                {t.replace('-', ' ')}
+                {t === 'notifications' && unreadNotifications > 0 ? (
+                  <Badge variant="secondary" className="ml-2">{unreadNotifications}</Badge>
+                ) : null}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
 
         {loading ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
@@ -201,6 +270,52 @@ export default function DashboardPage() {
           <>
             {tab === 'overview' && (
               <div className="space-y-8">
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <Card className="rounded-2xl">
+                    <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+                      <div>
+                        <Badge variant="secondary" className="mb-3 bg-blue-100 text-blue-800 hover:bg-blue-100">Reading analytics</Badge>
+                        <CardTitle className="text-xl">You've adopted {studentAnalytics.adoptedThisYear} books this year</CardTitle>
+                        <CardDescription className="mt-2">Favourite category: <span className="font-semibold text-foreground">{studentAnalytics.favouriteCategory}</span></CardDescription>
+                      </div>
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                        <Compass className="h-5 w-5" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-3 gap-3 text-sm">
+                        <Card className="bg-muted/40 shadow-none"><CardContent className="px-3 py-3"><p className="text-muted-foreground">Total adopted</p><p className="text-xl font-bold">{studentAnalytics.totalAdoptedBooks}</p></CardContent></Card>
+                        <Card className="bg-muted/40 shadow-none"><CardContent className="px-3 py-3"><p className="text-muted-foreground">This month</p><p className="text-xl font-bold">{studentAnalytics.adoptedThisMonth}</p></CardContent></Card>
+                        <Card className="bg-muted/40 shadow-none"><CardContent className="px-3 py-3"><p className="text-muted-foreground">Top authors</p><p className="text-xl font-bold">{studentAnalytics.topAuthors.length}</p></CardContent></Card>
+                      </div>
+                      <div className="mt-4">
+                        <TrendBars title="Adoptions this year" subtitle="Monthly completed adoptions" data={studentAnalytics.monthlyTrend} />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="rounded-2xl">
+                    <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+                      <div>
+                        <Badge variant="secondary" className="mb-3 bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Donor impact</Badge>
+                        <CardTitle className="text-xl">Your books have reached {donorAnalytics.studentsReached} students across {donorAnalytics.citiesReached} cities</CardTitle>
+                        <CardDescription className="mt-2">Favourite shared category: <span className="font-semibold text-foreground">{donorAnalytics.favouriteSharedCategory}</span></CardDescription>
+                      </div>
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                        <MapPinned className="h-5 w-5" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="mb-4 grid grid-cols-3 gap-3 text-sm">
+                        <Card className="bg-muted/40 shadow-none"><CardContent className="px-3 py-3"><p className="text-muted-foreground">Books shared</p><p className="text-xl font-bold">{donorAnalytics.totalBooksShared}</p></CardContent></Card>
+                        <Card className="bg-muted/40 shadow-none"><CardContent className="px-3 py-3"><p className="text-muted-foreground">Students</p><p className="text-xl font-bold">{donorAnalytics.studentsReached}</p></CardContent></Card>
+                        <Card className="bg-muted/40 shadow-none"><CardContent className="px-3 py-3"><p className="text-muted-foreground">Cities</p><p className="text-xl font-bold">{donorAnalytics.citiesReached}</p></CardContent></Card>
+                      </div>
+                      <ImpactMap points={donorAnalytics.impactMap} />
+                    </CardContent>
+                  </Card>
+                </div>
+
                 {donorRequests.filter((r: any) => r.status === 'pending').length > 0 && (
                   <div>
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">⏳ Pending Requests for Your Books</h2>
@@ -209,14 +324,12 @@ export default function DashboardPage() {
                         <div key={req._id} className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800 flex items-center justify-between gap-4">
                           <div>
                             <p className="font-medium text-gray-900 dark:text-white">{req.requesterId?.name} wants <span className="text-blue-600">{req.bookId?.title}</span></p>
-                            {req.message && <p className="text-sm text-gray-500 mt-1">"{req.message}"</p>}
+                            {req.message && <p className="text-sm text-gray-500 mt-1">“{req.message}”</p>}
                             <p className="text-xs text-gray-400 mt-1">{formatDate(req.requestDate)}</p>
                           </div>
-                          <div className="flex gap-2 flex-shrink-0">
-                            <button onClick={() => handleRequestResponse(req._id, 'approved')}
-                              className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors">Approve</button>
-                            <button onClick={() => handleRequestResponse(req._id, 'rejected')}
-                              className="px-3 py-1.5 bg-red-100 text-red-600 text-sm rounded-lg hover:bg-red-200 transition-colors">Decline</button>
+                          <div className="flex gap-2">
+                            <button onClick={() => handleRequestResponse(req._id, 'approved')} className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors">Approve</button>
+                            <button onClick={() => handleRequestResponse(req._id, 'rejected')} className="px-3 py-1.5 bg-red-100 text-red-600 text-sm rounded-lg hover:bg-red-200 transition-colors">Decline</button>
                           </div>
                         </div>
                       ))}
@@ -227,7 +340,7 @@ export default function DashboardPage() {
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">📚 Your Recent Books</h2>
                   {myBooks.length === 0 ? (
-                    <div className="text-center py-10 text-gray-400">
+                    <div className="text-center py-10 text-gray-400 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800">
                       <BookOpen className="w-10 h-10 mx-auto mb-3 text-gray-300" />
                       <p>No books donated yet. <Link href="/books/donate" className="text-blue-600 hover:underline">Donate your first book!</Link></p>
                     </div>
@@ -240,6 +353,126 @@ export default function DashboardPage() {
               </div>
             )}
 
+            {tab === 'analytics' && (
+              <div className="space-y-8">
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <div className="space-y-6">
+                    <Card>
+                      <CardHeader>
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                            <BarChart3 className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-lg">User reading analytics</CardTitle>
+                            <CardDescription>Track what you've adopted and what subjects you lean toward most.</CardDescription>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="mb-4 grid grid-cols-2 gap-3">
+                          <Card className="bg-muted/40 shadow-none"><CardContent className="px-4 py-4"><p className="text-sm text-muted-foreground">You've adopted</p><p className="text-3xl font-bold">{studentAnalytics.adoptedThisYear}</p><p className="mt-1 text-xs text-muted-foreground">books this year</p></CardContent></Card>
+                          <Card className="bg-muted/40 shadow-none"><CardContent className="px-4 py-4"><p className="text-sm text-muted-foreground">Favourite category</p><p className="text-xl font-bold">{studentAnalytics.favouriteCategory}</p><p className="mt-1 text-xs text-muted-foreground">based on your completed adoptions</p></CardContent></Card>
+                        </div>
+                        <TrendBars title="Reading trend" subtitle="Completed adoptions by month" data={studentAnalytics.monthlyTrend} />
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Category breakdown</CardTitle>
+                        <CardDescription>Your top adopted subjects at a glance.</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {studentAnalytics.categoryBreakdown.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No completed adoptions yet.</p>
+                        ) : (
+                          <div className="space-y-3">
+                            {studentAnalytics.categoryBreakdown.map((item: any) => {
+                              const width = Math.min(100, (item.count / Math.max(studentAnalytics.totalAdoptedBooks, 1)) * 100)
+                              return (
+                                <div key={item.label}>
+                                  <div className="mb-1 flex items-center justify-between text-sm">
+                                    <span>{item.label}</span>
+                                    <span className="text-muted-foreground">{item.count}</span>
+                                  </div>
+                                  <div className="h-2 rounded-full bg-muted">
+                                    <div className="h-2 rounded-full bg-primary" style={{ width: `${width}%` }} />
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="space-y-6">
+                    <Card>
+                      <CardHeader>
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                            <MapPinned className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-lg">Donor impact dashboard</CardTitle>
+                            <CardDescription>See how far your donated books travel and who they reach.</CardDescription>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="mb-4 grid grid-cols-3 gap-3">
+                          <Card className="bg-muted/40 shadow-none"><CardContent className="px-4 py-4"><p className="text-sm text-muted-foreground">Books shared</p><p className="text-2xl font-bold">{donorAnalytics.totalBooksShared}</p></CardContent></Card>
+                          <Card className="bg-muted/40 shadow-none"><CardContent className="px-4 py-4"><p className="text-sm text-muted-foreground">Students reached</p><p className="text-2xl font-bold">{donorAnalytics.studentsReached}</p></CardContent></Card>
+                          <Card className="bg-muted/40 shadow-none"><CardContent className="px-4 py-4"><p className="text-sm text-muted-foreground">Cities reached</p><p className="text-2xl font-bold">{donorAnalytics.citiesReached}</p></CardContent></Card>
+                        </div>
+                        <ImpactMap points={donorAnalytics.impactMap} />
+                      </CardContent>
+                    </Card>
+
+                    <TrendBars title="Sharing trend" subtitle="Completed deliveries by month" data={donorAnalytics.monthlyTrend} />
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Cities and latest recipients</CardTitle>
+                        <CardDescription>Where your reach is strongest and who received books most recently.</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="space-y-3">
+                            {donorAnalytics.cityBreakdown.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">No city data yet.</p>
+                            ) : donorAnalytics.cityBreakdown.slice(0, 5).map((item: any) => (
+                              <Card key={item.label} className="bg-muted/40 shadow-none">
+                                <CardContent className="flex items-center justify-between px-4 py-3">
+                                  <span className="text-sm">{item.label}</span>
+                                  <span className="text-sm font-semibold">{item.count}</span>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                          <div className="space-y-3">
+                            {donorAnalytics.recentRecipients.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">No completed deliveries yet.</p>
+                            ) : donorAnalytics.recentRecipients.map((item: any) => (
+                              <Card key={item.donationId} className="bg-muted/40 shadow-none">
+                                <CardContent className="px-4 py-3">
+                                  <p className="font-medium">{item.recipientName}</p>
+                                  <p className="text-sm text-muted-foreground">{item.title}</p>
+                                  <p className="mt-1 text-xs text-muted-foreground">{item.city} · {formatDate(item.deliveredAt)}</p>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {tab === 'my-books' && (
               <div>
                 <div className="flex items-center justify-between mb-4">
@@ -247,7 +480,7 @@ export default function DashboardPage() {
                   <Link href="/books/donate" className="text-sm text-blue-600 hover:underline">+ Add New</Link>
                 </div>
                 {myBooks.length === 0 ? (
-                  <div className="text-center py-16 text-gray-400">
+                  <div className="text-center py-16 text-gray-400 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800">
                     <BookOpen className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                     <p>You haven't donated any books yet.</p>
                     <Link href="/books/donate" className="mt-3 inline-block text-blue-600 hover:underline font-medium">Donate your first book</Link>
@@ -270,10 +503,8 @@ export default function DashboardPage() {
                         <div key={req._id} className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800">
                           <div className="flex items-center justify-between gap-4">
                             <div>
-                              <p className="font-medium text-gray-900 dark:text-white">
-                                <span className="text-blue-600">{req.requesterId?.name}</span> → {req.bookId?.title}
-                              </p>
-                              {req.message && <p className="text-sm text-gray-500 mt-1 italic">"{req.message}"</p>}
+                              <p className="font-medium text-gray-900 dark:text-white"><span className="text-blue-600">{req.requesterId?.name}</span> → {req.bookId?.title}</p>
+                              {req.message && <p className="text-sm text-gray-500 mt-1 italic">“{req.message}”</p>}
                               <p className="text-xs text-gray-400 mt-1">{formatDate(req.requestDate)}</p>
                             </div>
                             <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -332,9 +563,7 @@ export default function DashboardPage() {
                           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                             <div>
                               <p className="font-medium text-gray-900 dark:text-white">{don.bookId?.title}</p>
-                              <p className="text-sm text-gray-500">
-                                {isDonor ? `Given to ${don.receiverId?.name}` : `Received from ${don.donorId?.name}`}
-                              </p>
+                              <p className="text-sm text-gray-500">{isDonor ? `Given to ${don.receiverId?.name}` : `Received from ${don.donorId?.name}`}</p>
                               <p className="text-xs text-gray-400 mt-1">{formatDate(don.donationDate)} · {don.deliveryMethod}</p>
                             </div>
                             <div className="flex flex-wrap items-center gap-2 md:justify-end">
@@ -366,9 +595,7 @@ export default function DashboardPage() {
                                 </div>
                                 <StarDisplay value={don.reviewId.bookRating} showValue />
                               </div>
-                              {don.reviewId.reviewText && (
-                                <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">“{don.reviewId.reviewText}”</p>
-                              )}
+                              {don.reviewId.reviewText && <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">“{don.reviewId.reviewText}”</p>}
                               <div className="grid sm:grid-cols-2 gap-3 text-sm">
                                 <div className="bg-white dark:bg-gray-900 rounded-xl px-3 py-3">
                                   <p className="text-gray-500 mb-1">Donor feedback</p>
@@ -379,16 +606,6 @@ export default function DashboardPage() {
                                   <StarDisplay value={don.reviewId.descriptionAccuracyRating} size="sm" showValue />
                                 </div>
                               </div>
-                              {isReceiver && (
-                                <div className="flex flex-wrap gap-2 mt-3">
-                                  <button
-                                    onClick={() => setActiveReviewDonationId(activeReviewDonationId === don._id ? null : don._id)}
-                                    className="px-3 py-1.5 bg-amber-100 text-amber-700 text-sm rounded-lg hover:bg-amber-200 transition-colors"
-                                  >
-                                    {activeReviewDonationId === don._id ? 'Hide editor' : 'Edit private review'}
-                                  </button>
-                                </div>
-                              )}
                             </div>
                           )}
 
