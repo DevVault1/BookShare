@@ -13,6 +13,7 @@ import {
   Mail,
   MessagesSquare,
   LineChart,
+  Flag,
 } from 'lucide-react'
 
 import Navbar from '@/components/layout/Navbar'
@@ -32,6 +33,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<any[]>([])
   const [books, setBooks] = useState<any[]>([])
   const [requests, setRequests] = useState<any[]>([])
+  const [reports, setReports] = useState<any[]>([])
   const [report, setReport] = useState<any>(null)
   const [tab, setTab] = useState('overview')
   const [reportPeriod, setReportPeriod] = useState<'weekly' | 'monthly'>('weekly')
@@ -54,18 +56,20 @@ export default function AdminPage() {
   const fetchData = async (period: 'weekly' | 'monthly') => {
     setLoading(true)
     try {
-      const [statsRes, usersRes, booksRes, reqRes, reportRes] = await Promise.all([
+      const [statsRes, usersRes, booksRes, reqRes, reportRes, safetyReportsRes] = await Promise.all([
         api.get('/admin/stats'),
         api.get('/admin/users'),
         api.get('/admin/books'),
         api.get('/admin/requests'),
         api.get(`/analytics/admin/report?period=${period}`),
+        api.get('/reports/admin'),
       ])
       setStats(statsRes.data)
       setUsers(usersRes.data.users)
       setBooks(booksRes.data.books)
       setRequests(reqRes.data)
       setReport(reportRes.data)
+      setReports(safetyReportsRes.data)
     } catch (err) {
       console.error(err)
     } finally {
@@ -81,6 +85,12 @@ export default function AdminPage() {
 
   const handleUpdateUserRole = async (id: string, role: string) => {
     await api.put(`/admin/users/${id}`, { role })
+    fetchData(reportPeriod)
+  }
+
+
+  const handleUpdateReport = async (id: string, updates: Record<string, string>) => {
+    await api.put(`/reports/admin/${id}`, updates)
     fetchData(reportPeriod)
   }
 
@@ -171,6 +181,7 @@ export default function AdminPage() {
             <TabsTrigger value='users'>Users</TabsTrigger>
             <TabsTrigger value='books'>Books</TabsTrigger>
             <TabsTrigger value='requests'>Requests</TabsTrigger>
+            <TabsTrigger value='reports'>Reports</TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -387,6 +398,53 @@ export default function AdminPage() {
                       ))}
                     </tbody>
                   </table>
+                </CardContent>
+              </Card>
+            )}
+
+
+            {tab === 'reports' && (
+              <Card className='overflow-hidden'>
+                <CardHeader>
+                  <div className='flex items-center gap-3'>
+                    <div className='flex h-10 w-10 items-center justify-center rounded-2xl bg-red-50 text-red-600'>
+                      <Flag className='h-5 w-5' />
+                    </div>
+                    <div>
+                      <CardTitle>Trust & safety reports ({reports.length})</CardTitle>
+                      <CardDescription>Users can report fake listings, suspicious users, harassment, and inappropriate content. Admins can triage them here.</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className='space-y-4'>
+                  {reports.length === 0 ? (
+                    <div className='rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground'>No reports submitted yet.</div>
+                  ) : reports.map((reportItem: any) => (
+                    <Card key={reportItem._id} className='bg-muted/30 shadow-none'>
+                      <CardContent className='space-y-4 px-5 py-5'>
+                        <div className='flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between'>
+                          <div>
+                            <div className='mb-2 flex flex-wrap items-center gap-2'>
+                              <Badge variant='secondary'>{reportItem.category?.replace(/_/g, ' ')}</Badge>
+                              <Badge variant='outline'>{reportItem.targetType}</Badge>
+                              <Badge className={cn(
+                                reportItem.status === 'resolved' ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100' : reportItem.status === 'dismissed' ? 'bg-gray-200 text-gray-700 hover:bg-gray-200' : reportItem.status === 'under_review' ? 'bg-amber-100 text-amber-800 hover:bg-amber-100' : 'bg-red-100 text-red-800 hover:bg-red-100'
+                              )}>{reportItem.status?.replace(/_/g, ' ')}</Badge>
+                            </div>
+                            <p className='font-semibold'>{reportItem.reporterId?.name} <span className='text-sm font-normal text-muted-foreground'>({reportItem.reporterId?.email})</span></p>
+                            <p className='mt-2 text-sm text-muted-foreground'>{reportItem.description}</p>
+                            <p className='mt-2 text-xs text-muted-foreground'>Submitted {formatDate(reportItem.createdAt)}</p>
+                            {reportItem.adminNotes ? <p className='mt-2 rounded-lg border bg-background px-3 py-2 text-sm'><span className='font-medium'>Admin note:</span> {reportItem.adminNotes}</p> : null}
+                          </div>
+                          <div className='grid gap-2 sm:grid-cols-2'>
+                            <Button variant='outline' size='sm' onClick={() => handleUpdateReport(reportItem._id, { status: 'under_review' })}>Mark under review</Button>
+                            <Button variant='outline' size='sm' onClick={() => handleUpdateReport(reportItem._id, { status: 'resolved', adminNotes: 'Resolved by admin team.' })}>Resolve</Button>
+                            <Button variant='outline' size='sm' onClick={() => handleUpdateReport(reportItem._id, { status: 'dismissed', adminNotes: 'Dismissed after review.' })}>Dismiss</Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </CardContent>
               </Card>
             )}

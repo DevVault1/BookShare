@@ -3,8 +3,9 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { BookOpen, Mail, Lock, User, MapPin, Eye, EyeOff } from 'lucide-react'
+import { BookOpen, Mail, Lock, User, MapPin, Eye, EyeOff, Phone } from 'lucide-react'
 import { useAuthStore } from '@/lib/store/authStore'
+import SocialLoginButtons from '@/components/auth/SocialLoginButtons'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -16,6 +17,7 @@ export default function RegisterPage() {
     name: '', email: '', password: '',
     role: searchParams.get('role') || 'student',
     location: '',
+    phoneNumber: '',
   })
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -41,11 +43,10 @@ export default function RegisterPage() {
             <BookOpen className="w-8 h-8" /> Adopt A Book
           </Link>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mt-6 mb-2">Create your account</h1>
-          <p className="text-gray-500">Join the book-sharing community</p>
+          <p className="text-gray-500">Join the book-sharing community faster with email or social sign-in</p>
         </div>
 
         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-8">
-          {/* Role picker */}
           <div className="grid grid-cols-2 gap-3 mb-6">
             {['student', 'donor'].map(role => (
               <button
@@ -103,6 +104,16 @@ export default function RegisterPage() {
               </div>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Phone number (optional for SMS 2FA)</label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input name="phoneNumber" type="tel" value={form.phoneNumber} onChange={handleChange}
+                  placeholder="+94 77 123 4567"
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+            </div>
+
             {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{error}</div>}
 
             <button type="submit" disabled={isLoading}
@@ -110,6 +121,14 @@ export default function RegisterPage() {
               {isLoading ? 'Creating account...' : 'Create Account'}
             </button>
           </form>
+
+          <div className="my-6 flex items-center gap-3">
+            <div className="h-px flex-1 bg-gray-200" />
+            <span className="text-xs uppercase tracking-wider text-gray-400">or</span>
+            <div className="h-px flex-1 bg-gray-200" />
+          </div>
+
+          <SocialLoginButtons nextPath="/dashboard" />
 
           <p className="mt-6 text-center text-sm text-gray-500">
             Already have an account?{' '}
