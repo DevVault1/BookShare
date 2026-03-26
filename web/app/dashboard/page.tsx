@@ -31,6 +31,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import TwoFactorSetupCard from '@/components/auth/TwoFactorSetupCard'
 
 export default function DashboardPage() {
   const { user, fetchMe } = useAuthStore()
@@ -171,7 +172,7 @@ export default function DashboardPage() {
     { label: 'Reviews Pending', value: donations.filter((d: any) => d.receiverId?._id === user?._id && ['delivered', 'confirmed'].includes(d.status) && !d.reviewId).length, icon: Star, color: 'bg-amber-50 text-amber-600' },
   ]
 
-  const tabs = ['overview', 'analytics', 'my-books', 'requests', 'donations', 'notifications']
+  const tabs = ['overview', 'analytics', 'security', 'my-books', 'requests', 'donations', 'notifications']
   const unreadNotifications = notifications.filter((n: any) => !n.isRead).length
 
   return (
@@ -627,6 +628,24 @@ export default function DashboardPage() {
                     })}
                   </div>
                 )}
+              </div>
+            )}
+
+
+            {tab === 'security' && (
+              <div className="space-y-6">
+                <TwoFactorSetupCard user={user} onUpdated={fetchAll} />
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Trust & safety shortcuts</CardTitle>
+                    <CardDescription>Use these tools whenever you spot a suspicious listing, unsafe conversation, or fake profile.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-4 md:grid-cols-3">
+                    <Card className="bg-muted/40 shadow-none"><CardContent className="px-4 py-4"><p className="text-sm font-semibold">Report fake listings</p><p className="mt-1 text-sm text-muted-foreground">Open any book page and use the report button to alert admins.</p></CardContent></Card>
+                    <Card className="bg-muted/40 shadow-none"><CardContent className="px-4 py-4"><p className="text-sm font-semibold">Secure sign-in</p><p className="mt-1 text-sm text-muted-foreground">Enable email or SMS OTP to add a second step each time you log in.</p></CardContent></Card>
+                    <Card className="bg-muted/40 shadow-none"><CardContent className="px-4 py-4"><p className="text-sm font-semibold">Faster onboarding</p><p className="mt-1 text-sm text-muted-foreground">Use Google or Facebook login from the sign-in screen when OAuth is configured.</p></CardContent></Card>
+                  </CardContent>
+                </Card>
               </div>
             )}
 

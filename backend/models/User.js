@@ -14,24 +14,39 @@ const donorReputationSchema = new mongoose.Schema({
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
-  email: { type: String, required: true, unique: true, lowercase: true },
-  password: { type: String, required: true, minlength: 6 },
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  password: {
+    type: String,
+    minlength: 6,
+    required: function requiredPassword() {
+      return !this.googleId && !this.facebookId;
+    },
+  },
   role: { type: String, enum: ['donor', 'student', 'admin'], default: 'student' },
   location: { type: String, default: '' },
+  phoneNumber: { type: String, default: '' },
   profileImage: { type: String, default: '' },
   interests: [{ type: String }],
   bio: { type: String, default: '' },
   isActive: { type: Boolean, default: true },
+  authProvider: { type: String, enum: ['local', 'google', 'facebook', 'hybrid'], default: 'local' },
+  googleId: { type: String, default: '' },
+  facebookId: { type: String, default: '' },
+  twoFactorEnabled: { type: Boolean, default: false },
+  twoFactorMethod: { type: String, enum: ['email', 'sms'], default: 'email' },
+  lastLoginAt: { type: Date },
   donorReputation: { type: donorReputationSchema, default: () => ({}) },
 }, { timestamps: true });
 
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
+  if (!this.password) return next();
   this.password = await bcrypt.hash(this.password, 12);
   next();
 });
 
 userSchema.methods.comparePassword = async function (candidatePassword) {
+  if (!this.password) return false;
   return bcrypt.compare(candidatePassword, this.password);
 };
 

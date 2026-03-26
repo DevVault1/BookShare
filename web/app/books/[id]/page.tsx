@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { BookOpen, MapPin, User, MessageCircle, Heart, ArrowLeft, ShieldCheck, Clock3, BadgeCheck, PenSquare } from 'lucide-react'
+import { BookOpen, MapPin, User, MessageCircle, Heart, ArrowLeft, ShieldCheck, Clock3, BadgeCheck, PenSquare, Flag } from 'lucide-react'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import api from '@/lib/api'
@@ -12,6 +12,7 @@ import Link from 'next/link'
 import StarDisplay from '@/components/reviews/StarDisplay'
 import ReviewCard from '@/components/reviews/ReviewCard'
 import ReviewForm from '@/components/reviews/ReviewForm'
+import ReportDialog from '@/components/safety/ReportDialog'
 
 const emptyReviewsState = {
   reviews: [],
@@ -37,6 +38,8 @@ export default function BookDetailPage() {
   const [requestMsg, setRequestMsg] = useState('')
   const [showRequestForm, setShowRequestForm] = useState(false)
   const [showPublicReviewForm, setShowPublicReviewForm] = useState(false)
+  const [showReportDialog, setShowReportDialog] = useState(false)
+  const [reportContext, setReportContext] = useState<{ targetType: 'book' | 'user'; targetId?: string; targetLabel: string; initialCategory: string } | null>(null)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
 
@@ -332,28 +335,52 @@ export default function BookDetailPage() {
             )}
 
             {!showRequestForm && !success && (
-              <div className="flex gap-3">
-                {canRequest && (
-                  <button onClick={() => setShowRequestForm(true)}
-                    className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 transition-colors">
-                    <Heart className="w-5 h-5" /> Request This Book
-                  </button>
-                )}
+              <div className="space-y-3">
+                <div className="flex gap-3">
+                  {canRequest && (
+                    <button onClick={() => setShowRequestForm(true)}
+                      className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 transition-colors">
+                      <Heart className="w-5 h-5" /> Request This Book
+                    </button>
+                  )}
+                  {user && !isOwner && (
+                    <Link href={`/dashboard/chat?userId=${book.donorId?._id}&bookId=${book._id}`}
+                      className="flex-1 inline-flex items-center justify-center gap-2 border-2 border-blue-600 text-blue-600 font-semibold py-3 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+                      <MessageCircle className="w-5 h-5" /> Message Donor
+                    </Link>
+                  )}
+                  {!user && (
+                    <Link href="/auth/login"
+                      className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 transition-colors">
+                      Sign in to Request
+                    </Link>
+                  )}
+                  {book.status !== 'available' && !isOwner && (
+                    <div className="flex-1 text-center py-3 bg-gray-100 dark:bg-gray-800 rounded-xl text-gray-500 font-medium">
+                      Book not available
+                    </div>
+                  )}
+                </div>
                 {user && !isOwner && (
-                  <Link href={`/dashboard/chat?userId=${book.donorId?._id}&bookId=${book._id}`}
-                    className="flex-1 inline-flex items-center justify-center gap-2 border-2 border-blue-600 text-blue-600 font-semibold py-3 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
-                    <MessageCircle className="w-5 h-5" /> Message Donor
-                  </Link>
-                )}
-                {!user && (
-                  <Link href="/auth/login"
-                    className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 transition-colors">
-                    Sign in to Request
-                  </Link>
-                )}
-                {book.status !== 'available' && !isOwner && (
-                  <div className="flex-1 text-center py-3 bg-gray-100 dark:bg-gray-800 rounded-xl text-gray-500 font-medium">
-                    Book not available
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      onClick={() => {
+                        setReportContext({ targetType: 'book', targetId: book._id, targetLabel: `listing: ${book.title}`, initialCategory: 'fake_listing' })
+                        setShowReportDialog(true)
+                      }}
+                      className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50"
+                    >
+                      <Flag className="h-4 w-4" /> Report listing
+                    </button>
+                    <button
+                      onClick={() => {
+                        setReportContext({ targetType: 'user', targetId: book.donorId?._id, targetLabel: `donor: ${book.donorId?.name || 'Unknown user'}`, initialCategory: 'suspicious_user' })
+                        setShowReportDialog(true)
+                      }}
+                      className="inline-flex items-center gap-2 rounded-xl border border-amber-200 px-4 py-2 text-sm font-medium text-amber-700 transition hover:bg-amber-50"
+                    >
+                      <Flag className="h-4 w-4" /> Report donor
+                    </button>
                   </div>
                 )}
               </div>
@@ -435,6 +462,17 @@ export default function BookDetailPage() {
           )}
         </div>
       </div>
+      {reportContext ? (
+        <ReportDialog
+          open={showReportDialog}
+          onOpenChange={setShowReportDialog}
+          targetType={reportContext.targetType}
+          targetId={reportContext.targetId}
+          targetLabel={reportContext.targetLabel}
+          initialCategory={reportContext.initialCategory}
+          onSubmitted={(message) => setSuccess(message)}
+        />
+      ) : null}
       <Footer />
     </div>
   )

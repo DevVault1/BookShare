@@ -4,11 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { io, Socket } from 'socket.io-client'
-import { BookOpen, MessageCircle, Send, User } from 'lucide-react'
+import { BookOpen, MessageCircle, Send, User, Flag } from 'lucide-react'
 import Navbar from '@/components/layout/Navbar'
 import api from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import { cn, formatDate } from '@/lib/utils'
+import ReportDialog from '@/components/safety/ReportDialog'
 
 type ChatUser = {
   _id: string
@@ -87,6 +88,8 @@ export default function ChatPage() {
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
+  const [showReportDialog, setShowReportDialog] = useState(false)
+  const [reportSuccess, setReportSuccess] = useState('')
 
   const socketRef = useRef<Socket | null>(null)
   const activeConversationRef = useRef<ConversationSummary | null>(null)
@@ -286,14 +289,30 @@ export default function ChatPage() {
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Messages</h1>
             <p className="text-sm text-gray-500 mt-1">Chat directly with donors and students in real time.</p>
           </div>
-          <Link href="/books" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-            Browse more books
-          </Link>
+          <div className="flex items-center gap-3">
+            {activeConversation ? (
+              <button
+                type="button"
+                onClick={() => setShowReportDialog(true)}
+                className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50"
+              >
+                <Flag className="h-4 w-4" /> Report user
+              </button>
+            ) : null}
+            <Link href="/books" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+              Browse more books
+            </Link>
+          </div>
         </div>
 
         {error ? (
           <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
+          </div>
+        ) : null}
+        {reportSuccess ? (
+          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            {reportSuccess}
           </div>
         ) : null}
 
@@ -478,6 +497,17 @@ export default function ChatPage() {
           </section>
         </div>
       </div>
+      {activeConversation ? (
+        <ReportDialog
+          open={showReportDialog}
+          onOpenChange={setShowReportDialog}
+          targetType="user"
+          targetId={activeConversation.user?._id}
+          targetLabel={`user: ${activeConversation.user?.name || 'Unknown user'}`}
+          initialCategory="suspicious_user"
+          onSubmitted={(message) => setReportSuccess(message)}
+        />
+      ) : null}
     </div>
   )
 }
