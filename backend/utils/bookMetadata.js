@@ -192,15 +192,19 @@ async function lookupBookMetadataByIsbn(isbn) {
   }
 
   return {
-    ...merged,
-    isbn: merged.isbn || normalized,
-    category: INTERNAL_CATEGORIES.includes(merged.category) ? merged.category : 'Other',
+    book: {
+      ...merged,
+      isbn: merged.isbn || normalized,
+      category: INTERNAL_CATEGORIES.includes(merged.category) ? merged.category : 'Other',
+    },
     providers: {
       googleBooks: !!google,
       openLibrary: !!openLibrary,
     },
-    lookupIssues: issues,
-    metadataSyncedAt: new Date(),
+    details: issues,
+    message: issues.length > 0 
+      ? `Book metadata filled from available providers. Lookup issues: ${issues.join('; ')}`
+      : 'Book metadata filled successfully from available providers.',
   };
 }
 

@@ -1,6 +1,11 @@
-'use client'
+"use client"
+
 import { useEffect, useState } from 'react'
 import StarRatingInput from '@/components/reviews/StarRatingInput'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 
 interface ReviewPayload {
   bookRating: number
@@ -76,100 +81,74 @@ export default function ReviewForm({
   const isPublic = mode === 'public'
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 space-y-5">
-      <div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-          {isPublic ? 'Share a public review' : 'Rate this completed donation'}
-        </h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+    <Card className="rounded-[1.75rem] border-border/60">
+      <CardHeader>
+        <CardTitle>{isPublic ? 'Share a public review' : 'Rate this completed donation'}</CardTitle>
+        <CardDescription>
           {isPublic
-            ? 'Public reviews are visible to other signed-in users on the book page.'
-            : 'Private feedback stays inside the donation details and powers donor reputation.'}
-        </p>
-      </div>
+            ? 'Visible to signed-in readers on the book page.'
+            : 'Private feedback helps improve donor trust and delivery quality.'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid gap-5">
+          <StarRatingInput
+            label={isPublic ? 'Book rating' : 'Overall book rating'}
+            helperText="How would you rate this book overall?"
+            value={bookRating}
+            onChange={setBookRating}
+          />
 
-      <div className="grid gap-5">
-        <StarRatingInput
-          label={isPublic ? 'Star rating' : 'Book rating'}
-          helperText={isPublic ? 'How would you rate this book overall?' : 'How would you rate this book overall?'}
-          value={bookRating}
-          onChange={setBookRating}
-        />
-
-        {!isPublic && (
-          <>
-            <StarRatingInput
-              label="Donor feedback"
-              helperText="How was the donor experience from your side?"
-              value={donorFeedbackRating}
-              onChange={setDonorFeedbackRating}
-            />
-            <StarRatingInput
-              label="Description accuracy"
-              helperText="Did the actual book match the donor's description and condition?"
-              value={descriptionAccuracyRating}
-              onChange={setDescriptionAccuracyRating}
-            />
-          </>
-        )}
-      </div>
-
-      <div>
-        <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
-          {isPublic ? 'Written comment' : 'Private notes'}
-        </label>
-        <textarea
-          value={reviewText}
-          onChange={(e: any) => setReviewText(e.target.value)}
-          rows={4}
-          maxLength={1000}
-          placeholder={isPublic
-            ? 'What did you think about this book? Share a helpful comment for other readers...'
-            : 'Share what you liked about the book and how the donation experience went...'}
-          className="w-full border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm bg-white dark:bg-gray-950 text-gray-900 dark:text-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <div className="flex items-center justify-between text-xs mt-1">
-          <span className="text-gray-400">{isPublic ? 'Required for public reviews' : 'Optional'}</span>
-          <span className="text-gray-400">{reviewText.length}/1000</span>
+          {!isPublic ? (
+            <>
+              <StarRatingInput
+                label="Donor feedback"
+                helperText="How smooth was the experience with the donor?"
+                value={donorFeedbackRating}
+                onChange={setDonorFeedbackRating}
+              />
+              <StarRatingInput
+                label="Description accuracy"
+                helperText="Did the book match the donor's description and condition?"
+                value={descriptionAccuracyRating}
+                onChange={setDescriptionAccuracyRating}
+              />
+            </>
+          ) : null}
         </div>
-      </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-          {error}
+        <div className="space-y-2">
+          <Label>{isPublic ? 'Written comment' : 'Private notes'}</Label>
+          <Textarea
+            value={reviewText}
+            onChange={(event) => setReviewText(event.target.value)}
+            rows={5}
+            maxLength={1000}
+            placeholder={isPublic
+              ? 'Share a thoughtful review for future readers.'
+              : 'Capture what went well and what could improve.'}
+            className="min-h-[140px]"
+          />
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>{isPublic ? 'Helpful comments build trust.' : 'Optional but encouraged.'}</span>
+            <span>{reviewText.length}/1000</span>
+          </div>
         </div>
-      )}
 
-      <div className="flex flex-wrap gap-3">
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={submitting || deleting}
-          className="bg-blue-600 text-white font-semibold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50"
-        >
-          {submitting ? 'Saving...' : submitLabel}
-        </button>
-        {onDelete && (
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={submitting || deleting}
-            className="border border-red-200 px-5 py-2.5 rounded-xl text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-          >
-            {deleting ? 'Deleting...' : deleteLabel}
-          </button>
-        )}
-        {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={submitting || deleting}
-            className="border border-gray-200 dark:border-gray-700 px-5 py-2.5 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          >
-            Cancel
-          </button>
-        )}
-      </div>
-    </div>
+        {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">{error}</div> : null}
+
+        <div className="flex flex-wrap gap-3">
+          <Button type="button" onClick={handleSubmit} disabled={submitting || deleting} className="rounded-xl">
+            {submitting ? 'Saving...' : submitLabel}
+          </Button>
+          {onDelete ? (
+            <Button type="button" variant="outline" onClick={handleDelete} disabled={submitting || deleting} className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-500/30 dark:text-red-300 dark:hover:bg-red-500/10">
+              {deleting ? 'Deleting...' : deleteLabel}
+            </Button>
+          ) : null}
+          {onCancel ? <Button type="button" variant="ghost" onClick={onCancel} disabled={submitting || deleting} className="rounded-xl">Cancel</Button> : null}
+        </div>
+      </CardContent>
+    </Card>
   )
 }

@@ -1,20 +1,27 @@
-'use client'
-import { useState, useEffect } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
-import { Search, Filter, BookOpen, Plus } from 'lucide-react'
+"use client"
+
+import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Filter, Plus, Search, SlidersHorizontal } from 'lucide-react'
+
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import BookCard from '@/components/books/BookCard'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
 import api from '@/lib/api'
-import Link from 'next/link'
 import { useAuthStore } from '@/lib/store/authStore'
 
 const CATEGORIES = ['All', 'Fiction', 'Non-Fiction', 'Science', 'Mathematics', 'History', 'Technology', 'Literature', 'Arts', 'Children', 'Other']
 const CONDITIONS = ['All', 'New', 'Like New', 'Good', 'Fair', 'Poor']
 
 export default function BooksPage() {
-  const [books, setBooks] = useState([])
+  const [books, setBooks] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [pages, setPages] = useState(1)
   const [loading, setLoading] = useState(true)
@@ -22,12 +29,12 @@ export default function BooksPage() {
   const [category, setCategory] = useState('All')
   const [condition, setCondition] = useState('All')
   const [page, setPage] = useState(1)
-  const { user } = useAuthStore()
   const searchParams = useSearchParams()
+  const { user } = useAuthStore()
 
   useEffect(() => {
-    const cat = searchParams.get('category')
-    if (cat) setCategory(cat)
+    const categoryParam = searchParams.get('category')
+    if (categoryParam) setCategory(categoryParam)
   }, [searchParams])
 
   useEffect(() => {
@@ -37,134 +44,161 @@ export default function BooksPage() {
   const fetchBooks = async () => {
     setLoading(true)
     try {
-      const params: any = { page, limit: 12 }
+      const params: Record<string, string | number> = { page, limit: 12 }
       if (search) params.search = search
       if (category !== 'All') params.category = category
       if (condition !== 'All') params.condition = condition
-
       const { data } = await api.get('/books', { params })
       setBooks(data.books)
       setTotal(data.total)
       setPages(data.pages)
-    } catch (err) {
-      console.error(err)
+    } catch (error) {
+      console.error(error)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSearch = (event: React.FormEvent) => {
+    event.preventDefault()
     setPage(1)
     fetchBooks()
   }
 
+  const activeFilters = useMemo(() => [category !== 'All' ? category : null, condition !== 'All' ? condition : null].filter(Boolean), [category, condition])
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="page-shell">
       <Navbar />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Browse Books</h1>
-            <p className="text-gray-500 mt-1">{total} books available for adoption</p>
-          </div>
-          {user && (
-            <Link href="/books/donate"
-              className="inline-flex items-center gap-2 bg-blue-600 text-white font-semibold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors">
-              <Plus className="w-4 h-4" /> Donate a Book
-            </Link>
-          )}
-        </div>
-
-        {/* Search + Filters */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 mb-8 shadow-sm border border-gray-100 dark:border-gray-800">
-          <form onSubmit={handleSearch} className="flex gap-3 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search books, authors..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+      <main className="mx-auto max-w-[1920px] px-3 pb-10 pt-6 sm:px-6">
+        <section className="surface-card overflow-hidden rounded-[2rem] p-6 sm:p-8">
+          <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Catalog experience</p>
+              <h1 className="mt-3 text-3xl font-semibold text-balance sm:text-5xl">Discover books with cleaner browsing, faster filters, and richer trust signals.</h1>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
+                Browse every available title, compare condition and donor reputation, and move from discovery to messaging in a few clicks.
+              </p>
             </div>
-            <button type="submit" className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-blue-700 transition-colors">
-              Search
-            </button>
-          </form>
+            <Card className="rounded-[1.75rem] border-border/60 bg-primary text-primary-foreground shadow-none">
+              <CardContent className="p-6">
+                <p className="text-sm text-primary-foreground/80">Available inventory</p>
+                <p className="mt-2 text-4xl font-semibold">{total}</p>
+                <p className="mt-2 text-sm text-primary-foreground/80">Premium cards, responsive grid, and polished empty states.</p>
+                {user ? (
+                  <Button asChild variant="glass" className="mt-5 rounded-full bg-white text-slate-950 hover:bg-white/90 dark:bg-white dark:text-slate-950">
+                    <Link href="/books/donate"><Plus className="mr-2 h-4 w-4" /> Donate a book</Link>
+                  </Button>
+                ) : null}
+              </CardContent>
+            </Card>
+          </div>
+        </section>
 
-          {/* Category filter */}
-          <div className="flex gap-2 flex-wrap mb-3">
-            {CATEGORIES.map(cat => (
-              <button
-                key={cat}
-                onClick={() => { setCategory(cat); setPage(1) }}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${category === cat ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
+        <section className="mt-6 grid gap-6 lg:grid-cols-[290px_1fr]">
+          <Card className="rounded-[1.75rem] lg:sticky lg:top-28 h-fit">
+            <CardHeader>
+              <div className="flex items-center gap-2 text-primary">
+                <SlidersHorizontal className="h-4 w-4" />
+                <CardTitle className="text-lg">Search & filters</CardTitle>
+              </div>
+              <CardDescription>Fine-tune the book catalog without losing context.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <form onSubmit={handleSearch} className="space-y-3">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search books or authors" className="pl-10" />
+                </div>
+                <Button type="submit" className="w-full rounded-xl">Search</Button>
+              </form>
 
-          {/* Condition filter */}
-          <div className="flex gap-2 flex-wrap">
-            <span className="text-sm text-gray-500 self-center mr-1">Condition:</span>
-            {CONDITIONS.map(cond => (
-              <button
-                key={cond}
-                onClick={() => { setCondition(cond); setPage(1) }}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${condition === cond ? 'bg-gray-800 dark:bg-white text-white dark:text-gray-900' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200'}`}
-              >
-                {cond}
-              </button>
-            ))}
-          </div>
-        </div>
+              <div>
+                <p className="mb-3 text-sm font-medium">Category</p>
+                <div className="flex flex-wrap gap-2">
+                  {CATEGORIES.map((item) => (
+                    <button key={item} type="button" onClick={() => { setCategory(item); setPage(1) }} className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${category === item ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground'}`}>
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-        {/* Books grid */}
-        {loading ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="bg-white dark:bg-gray-900 rounded-2xl h-72 animate-pulse" />
-            ))}
-          </div>
-        ) : books.length === 0 ? (
-          <div className="text-center py-20">
-            <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-600 dark:text-gray-400 mb-2">No books found</h3>
-            <p className="text-gray-400">Try adjusting your filters or search term</p>
-          </div>
-        ) : (
-          <motion.div
-            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          >
-            {books.map((book: any, i) => (
-              <motion.div key={book._id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
-                <BookCard book={book} />
+              <div>
+                <p className="mb-3 text-sm font-medium">Condition</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {CONDITIONS.map((item) => (
+                    <button key={item} type="button" onClick={() => { setCondition(item); setPage(1) }} className={`rounded-2xl border px-3 py-2 text-sm transition ${condition === item ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-background text-muted-foreground hover:border-primary/30 hover:text-foreground'}`}>
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-[1.5rem] bg-muted/70 p-4">
+                <p className="text-sm font-medium">Active filters</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {activeFilters.length ? activeFilters.map((item) => <span key={item} className="rounded-full bg-background px-3 py-1 text-xs text-muted-foreground">{item}</span>) : <span className="text-sm text-muted-foreground">No filters selected</span>}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-2xl font-semibold">Catalog</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{total} books ready for discovery</p>
+              </div>
+              {user ? (
+                <Button asChild variant="outline" className="rounded-full">
+                  <Link href="/books/donate"><Plus className="mr-2 h-4 w-4" /> Donate a book</Link>
+                </Button>
+              ) : null}
+            </div>
+
+            {loading ? (
+              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div key={index} className="space-y-3 rounded-[1.75rem] border border-border/60 bg-card p-4">
+                    <Skeleton className="aspect-[4/5] w-full rounded-[1.5rem]" />
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-6 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </div>
+                ))}
+              </div>
+            ) : books.length === 0 ? (
+              <EmptyState
+                icon={Filter}
+                title="No books match these filters"
+                description="Try a broader category, clear the current condition filter, or search for another title."
+                action={<Button variant="outline" onClick={() => { setSearch(''); setCategory('All'); setCondition('All'); setPage(1) }}>Clear filters</Button>}
+              />
+            ) : (
+              <motion.div layout className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                <AnimatePresence>
+                  {books.map((book) => (
+                    <motion.div key={book._id} layout initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                      <BookCard book={book} />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               </motion.div>
-            ))}
-          </motion.div>
-        )}
+            )}
 
-        {/* Pagination */}
-        {pages > 1 && (
-          <div className="flex justify-center gap-2 mt-10">
-            {Array.from({ length: pages }, (_, i) => i + 1).map(p => (
-              <button
-                key={p}
-                onClick={() => setPage(p)}
-                className={`w-10 h-10 rounded-lg font-medium transition-colors ${page === p ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100 border border-gray-200 dark:border-gray-700'}`}
-              >
-                {p}
-              </button>
-            ))}
+            {pages > 1 ? (
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
+                {Array.from({ length: pages }, (_, index) => index + 1).map((number) => (
+                  <Button key={number} variant={page === number ? 'default' : 'outline'} onClick={() => setPage(number)} className="rounded-full px-4">
+                    {number}
+                  </Button>
+                ))}
+              </div>
+            ) : null}
           </div>
-        )}
-      </div>
+        </section>
+      </main>
       <Footer />
     </div>
   )

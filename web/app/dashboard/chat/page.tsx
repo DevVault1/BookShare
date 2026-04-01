@@ -4,12 +4,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { io, Socket } from 'socket.io-client'
-import { BookOpen, MessageCircle, Send, User, Flag } from 'lucide-react'
+import { BookOpen, Flag, MessageCircle, Search, Send, User } from 'lucide-react'
+
 import Navbar from '@/components/layout/Navbar'
 import api from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import { cn, formatDate } from '@/lib/utils'
 import ReportDialog from '@/components/safety/ReportDialog'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 
 type ChatUser = {
   _id: string
@@ -90,6 +97,7 @@ export default function ChatPage() {
   const [error, setError] = useState('')
   const [showReportDialog, setShowReportDialog] = useState(false)
   const [reportSuccess, setReportSuccess] = useState('')
+  const [search, setSearch] = useState('')
 
   const socketRef = useRef<Socket | null>(null)
   const activeConversationRef = useRef<ConversationSummary | null>(null)
@@ -105,6 +113,16 @@ export default function ChatPage() {
     }
     return activeConversation.user.name
   }, [activeConversation])
+
+  const filteredConversations = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return conversations
+    return conversations.filter((conversation) => {
+      return [conversation.user?.name, conversation.book?.title, conversation.lastMessage]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query))
+    })
+  }, [conversations, search])
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 40)
@@ -280,191 +298,167 @@ export default function ChatPage() {
     }
   }
 
+  if (!user) return null
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
+    <div className="page-shell">
       <Navbar />
-      <div className="flex-1 max-w-6xl mx-auto w-full px-4 py-6">
-        <div className="mb-5 flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Messages</h1>
-            <p className="text-sm text-gray-500 mt-1">Chat directly with donors and students in real time.</p>
-          </div>
-          <div className="flex items-center gap-3">
+      <main className="mx-auto max-w-[1920px] px-3 pb-10 pt-6 sm:px-6">
+        <section className="surface-card rounded-[2rem] p-6 sm:p-8">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Messaging workspace</p>
+              <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">Real-time conversations with a cleaner, more premium layout.</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">Talk to donors and readers, keep book context visible, and handle reports without leaving the chat surface.</p>
+            </div>
             {activeConversation ? (
-              <button
-                type="button"
-                onClick={() => setShowReportDialog(true)}
-                className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50"
-              >
-                <Flag className="h-4 w-4" /> Report user
-              </button>
+              <Button variant="outline" onClick={() => setShowReportDialog(true)} className="rounded-full border-red-200 text-red-700 hover:bg-red-50 hover:text-red-700 dark:border-red-500/30 dark:text-red-300 dark:hover:bg-red-500/10">
+                <Flag className="mr-2 h-4 w-4" /> Report user
+              </Button>
             ) : null}
-            <Link href="/books" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-              Browse more books
-            </Link>
           </div>
-        </div>
-
-        {error ? (
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </div>
-        ) : null}
-        {reportSuccess ? (
-          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            {reportSuccess}
-          </div>
-        ) : null}
-
-        <div className="grid lg:grid-cols-[320px,1fr] gap-4 min-h-[72vh]">
-          <aside className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-gray-100 dark:border-gray-800">
-              <h2 className="font-semibold text-gray-900 dark:text-white">Conversations</h2>
-              <p className="text-xs text-gray-400 mt-1">Unread badges clear when you open a thread.</p>
+          {reportSuccess ? (
+            <div className="mt-5 rounded-[1.5rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+              {reportSuccess}
             </div>
+          ) : null}
+          {error ? (
+            <div className="mt-5 rounded-[1.5rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+              {error}
+            </div>
+          ) : null}
+        </section>
 
-            <div className="flex-1 overflow-y-auto">
-              {loadingConversations ? (
-                <div className="p-5 space-y-3 animate-pulse">
-                  {[1, 2, 3].map((item) => (
-                    <div key={item} className="h-16 rounded-xl bg-gray-100 dark:bg-gray-800" />
-                  ))}
-                </div>
-              ) : conversations.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center px-6 py-12 text-gray-400">
-                  <MessageCircle className="w-12 h-12 mb-3 text-gray-300" />
-                  <p className="font-medium text-gray-500">No conversations yet</p>
-                  <p className="text-sm mt-1">Use “Message Donor” from any book page to start chatting.</p>
-                </div>
-              ) : (
-                conversations.map((conversation) => {
-                  const isActive = activeConversation?._id === conversation._id
-                  return (
-                    <button
-                      key={conversation._id}
-                      onClick={() => openConversation(conversation)}
-                      className={cn(
-                        'w-full text-left px-4 py-3 border-b border-gray-50 dark:border-gray-800/70 hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors',
-                        isActive && 'bg-blue-50 dark:bg-blue-900/20'
-                      )}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="w-11 h-11 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center overflow-hidden shrink-0">
-                          {conversation.user?.profileImage ? (
-                            <img src={conversation.user.profileImage} alt={conversation.user.name} className="w-11 h-11 rounded-full object-cover" />
-                          ) : (
-                            <span className="font-semibold text-sm">{conversation.user?.name?.[0] || '?'}</span>
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="font-medium text-sm text-gray-900 dark:text-white truncate">{conversation.user?.name}</p>
-                              {conversation.book?.title ? (
-                                <p className="text-xs text-blue-600 truncate mt-0.5">About: {conversation.book.title}</p>
-                              ) : null}
+        <section className="mt-6 grid gap-6 xl:grid-cols-[340px_1fr]">
+          <Card className="rounded-[1.75rem] xl:sticky xl:top-28 h-fit">
+            <CardHeader>
+              <CardTitle>Conversations</CardTitle>
+              <CardDescription>Search by reader, donor, book, or latest message.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search conversations" className="pl-10" />
+              </div>
+
+              <div className="max-h-[68vh] space-y-2 overflow-y-auto pr-1 hide-scrollbar">
+                {loadingConversations ? (
+                  Array.from({ length: 6 }).map((_, index) => (
+                    <div key={index} className="animate-pulse rounded-[1.5rem] bg-muted p-4 h-24" />
+                  ))
+                ) : filteredConversations.length === 0 ? (
+                  <EmptyState icon={MessageCircle} title="No conversations found" description="Start from a book page by tapping “Message donor” to open a new thread." className="border-0 shadow-none" />
+                ) : (
+                  filteredConversations.map((conversation) => {
+                    const isActive = activeConversation?._id === conversation._id
+                    return (
+                      <button
+                        key={conversation._id}
+                        type="button"
+                        onClick={() => openConversation(conversation)}
+                        className={cn('w-full rounded-[1.5rem] border p-4 text-left transition', isActive ? 'border-primary/20 bg-primary/5' : 'border-border/70 hover:bg-accent/60')}
+                      >
+                        <div className="flex items-start gap-3">
+                          <Avatar className="h-11 w-11">
+                            <AvatarImage src={conversation.user?.profileImage} alt={conversation.user?.name} />
+                            <AvatarFallback>{conversation.user?.name?.[0] || '?'}</AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="truncate font-medium">{conversation.user?.name}</p>
+                                {conversation.book?.title ? <p className="mt-0.5 truncate text-xs text-primary">About: {conversation.book.title}</p> : null}
+                              </div>
+                              {conversation.unreadCount ? <span className="min-w-5 rounded-full bg-primary px-1.5 py-0.5 text-[11px] text-primary-foreground">{conversation.unreadCount}</span> : null}
                             </div>
-                            {conversation.unreadCount ? (
-                              <span className="shrink-0 min-w-5 h-5 px-1 rounded-full bg-blue-600 text-white text-[11px] flex items-center justify-center">
-                                {conversation.unreadCount}
-                              </span>
-                            ) : null}
+                            <p className="mt-2 truncate text-sm text-muted-foreground">{conversation.lastMessage || 'No messages yet'}</p>
+                            <p className="mt-1 text-[11px] text-muted-foreground">{conversation.lastMessageAt ? formatDate(conversation.lastMessageAt) : 'Start the conversation'}</p>
                           </div>
-                          <p className="text-xs text-gray-500 truncate mt-1">{conversation.lastMessage || 'No messages yet'}</p>
-                          <p className="text-[11px] text-gray-400 mt-1">
-                            {conversation.lastMessageAt ? formatDate(conversation.lastMessageAt) : 'Start the conversation'}
-                          </p>
                         </div>
-                      </div>
-                    </button>
-                  )
-                })
-              )}
-            </div>
-          </aside>
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-          <section className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col min-h-[72vh]">
+          <Card className="overflow-hidden rounded-[1.75rem]">
             {activeConversation ? (
               <>
-                <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center overflow-hidden shrink-0">
-                      {activeConversation.user?.profileImage ? (
-                        <img src={activeConversation.user.profileImage} alt={activeConversation.user.name} className="w-11 h-11 rounded-full object-cover" />
-                      ) : (
-                        <span className="font-semibold text-sm">{activeConversation.user?.name?.[0] || '?'}</span>
-                      )}
+                <CardHeader className="border-b border-border/70 bg-muted/30">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={activeConversation.user?.profileImage} alt={activeConversation.user?.name} />
+                        <AvatarFallback>{activeConversation.user?.name?.[0] || '?'}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <CardTitle className="text-lg">{activeConversationTitle}</CardTitle>
+                        <CardDescription>{activeConversation.book?.author ? `Book by ${activeConversation.book.author}` : `Message ${activeConversation.user?.role === 'donor' ? 'donor' : 'student'} directly`}</CardDescription>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-gray-900 dark:text-white truncate">{activeConversationTitle}</p>
-                      <p className="text-sm text-gray-500 truncate">
-                        {activeConversation.book?.author ? `Book by ${activeConversation.book.author}` : `Message ${activeConversation.user?.role === 'donor' ? 'donor' : 'student'} directly`}
-                      </p>
-                    </div>
+                    {activeConversation.book ? (
+                      <Button asChild variant="outline" className="rounded-full">
+                        <Link href={`/books/${activeConversation.book._id}`}>
+                          <BookOpen className="mr-2 h-4 w-4" /> View book
+                        </Link>
+                      </Button>
+                    ) : null}
                   </div>
+                </CardHeader>
 
-                  {activeConversation.book ? (
-                    <div className="mt-4 rounded-xl border border-blue-100 dark:border-blue-900/50 bg-blue-50/70 dark:bg-blue-950/20 p-3 flex items-center gap-3">
-                      <div className="w-12 h-16 rounded-lg overflow-hidden bg-white shrink-0">
+                {activeConversation.book ? (
+                  <div className="border-b border-border/70 bg-primary/5 px-6 py-4">
+                    <div className="flex items-center gap-3 rounded-[1.5rem] border border-primary/15 bg-background/80 p-3">
+                      <div className="h-16 w-12 overflow-hidden rounded-xl bg-muted">
                         {activeConversation.book.image ? (
-                          <img src={activeConversation.book.image} alt={activeConversation.book.title} className="w-full h-full object-cover" />
+                          <img src={activeConversation.book.image} alt={activeConversation.book.title} className="h-full w-full object-cover" />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-blue-500">
-                            <BookOpen className="w-5 h-5" />
-                          </div>
+                          <div className="grid h-full place-items-center text-primary"><BookOpen className="h-5 w-5" /></div>
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{activeConversation.book.title}</p>
-                        <p className="text-xs text-gray-500 truncate">{activeConversation.book.author || 'Book discussion'}</p>
-                        <Link href={`/books/${activeConversation.book._id}`} className="text-xs text-blue-600 hover:text-blue-700 font-medium inline-flex mt-1">
-                          View book details
-                        </Link>
+                        <p className="truncate font-medium">{activeConversation.book.title}</p>
+                        <p className="truncate text-sm text-muted-foreground">{activeConversation.book.author || 'Book discussion'}</p>
                       </div>
                     </div>
-                  ) : null}
-                </div>
+                  </div>
+                ) : null}
 
-                <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 bg-gray-50/50 dark:bg-gray-950/50">
+                <div className="max-h-[58vh] min-h-[420px] overflow-y-auto bg-background/60 px-6 py-5 hide-scrollbar">
                   {loadingMessages ? (
-                    <div className="space-y-3 animate-pulse">
+                    <div className="space-y-3">
                       {[1, 2, 3, 4].map((item) => (
-                        <div key={item} className={cn('h-14 rounded-2xl bg-gray-200/70 dark:bg-gray-800', item % 2 === 0 ? 'ml-auto w-2/3' : 'w-3/4')} />
+                        <div key={item} className={cn('h-16 rounded-[1.5rem] bg-muted', item % 2 === 0 ? 'ml-auto w-2/3' : 'w-3/4')} />
                       ))}
                     </div>
                   ) : messages.length === 0 ? (
-                    <div className="h-full min-h-[320px] flex flex-col items-center justify-center text-center text-gray-400 px-6">
-                      <MessageCircle className="w-12 h-12 mb-3 text-gray-300" />
-                      <p className="font-medium text-gray-500">Start the conversation</p>
-                      <p className="text-sm mt-1">Ask about pickup, delivery, or book condition.</p>
-                    </div>
+                    <EmptyState icon={MessageCircle} title="Start the conversation" description="Ask about pickup timing, delivery, condition, or reading suitability." className="border-0 shadow-none min-h-[320px]" />
                   ) : (
-                    messages.map((message) => {
-                      const senderId = typeof message.senderId === 'string' ? message.senderId : message.senderId?._id
-                      const isMe = senderId === user?._id
-                      return (
-                        <div key={message._id} className={cn('flex', isMe ? 'justify-end' : 'justify-start')}>
-                          <div className={cn(
-                            'max-w-[80%] md:max-w-[65%] rounded-2xl px-4 py-3 shadow-sm',
-                            isMe
-                              ? 'bg-blue-600 text-white rounded-br-sm'
-                              : 'bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 text-gray-900 dark:text-white rounded-bl-sm'
-                          )}>
-                            <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.message}</p>
-                            <p className={cn('text-[11px] mt-2', isMe ? 'text-blue-100' : 'text-gray-400')}>
-                              {new Date(message.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                            </p>
+                    <div className="space-y-3">
+                      {messages.map((message) => {
+                        const senderId = typeof message.senderId === 'string' ? message.senderId : message.senderId?._id
+                        const isMe = senderId === user?._id
+                        return (
+                          <div key={message._id} className={cn('flex', isMe ? 'justify-end' : 'justify-start')}>
+                            <div className={cn('max-w-[85%] rounded-[1.5rem] px-4 py-3 shadow-sm md:max-w-[70%]', isMe ? 'bg-primary text-primary-foreground rounded-br-md' : 'border border-border/70 bg-card rounded-bl-md')}>
+                              <p className="whitespace-pre-wrap text-sm leading-7">{message.message}</p>
+                              <p className={cn('mt-2 text-[11px]', isMe ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
+                                {new Date(message.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      )
-                    })
+                        )
+                      })}
+                      <div ref={bottomRef} />
+                    </div>
                   )}
-                  <div ref={bottomRef} />
                 </div>
 
-                <div className="p-4 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
+                <div className="border-t border-border/70 bg-card px-6 py-4">
                   <div className="flex items-end gap-3">
-                    <textarea
+                    <Textarea
                       value={input}
                       onChange={(event) => setInput(event.target.value)}
                       onKeyDown={(event) => {
@@ -474,29 +468,24 @@ export default function ChatPage() {
                         }
                       }}
                       rows={2}
-                      placeholder="Type a message…"
-                      className="flex-1 resize-none rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Type a message..."
+                      className="min-h-[88px] flex-1 resize-none"
                     />
-                    <button
-                      onClick={handleSendMessage}
-                      disabled={!input.trim() || sending}
-                      className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Send className="w-4 h-4" />
-                    </button>
+                    <Button onClick={handleSendMessage} disabled={!input.trim() || sending} className="h-12 rounded-2xl px-5">
+                      <Send className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               </>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-center px-6 text-gray-400">
-                <User className="w-12 h-12 mb-3 text-gray-300" />
-                <p className="font-medium text-gray-500">Choose a conversation</p>
-                <p className="text-sm mt-1">Or open a book and tap “Message Donor” to start chatting.</p>
-              </div>
+              <CardContent className="flex min-h-[560px] items-center justify-center p-8">
+                <EmptyState icon={User} title="Choose a conversation" description="Select an existing thread, or open a book and tap “Message donor” to create a new chat." className="border-0 shadow-none" />
+              </CardContent>
             )}
-          </section>
-        </div>
-      </div>
+          </Card>
+        </section>
+      </main>
+
       {activeConversation ? (
         <ReportDialog
           open={showReportDialog}

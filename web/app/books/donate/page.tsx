@@ -1,32 +1,38 @@
-'use client'
+"use client"
+
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
-import { Upload, BookOpen, ArrowLeft, Loader2, ScanLine, Search, Sparkles } from 'lucide-react'
+import { Loader2, ScanLine, Sparkles, UploadCloud } from 'lucide-react'
+
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
-import api from '@/lib/api'
-import { useAuthStore } from '@/lib/store/authStore'
-import Link from 'next/link'
 import IsbnScannerModal from '@/components/books/IsbnScannerModal'
+import { useAuthStore } from '@/lib/store/authStore'
+import api from '@/lib/api'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 
 const CATEGORIES = ['Fiction', 'Non-Fiction', 'Science', 'Mathematics', 'History', 'Technology', 'Literature', 'Arts', 'Children', 'Other']
 const CONDITIONS = ['New', 'Like New', 'Good', 'Fair', 'Poor']
 
 const LANGUAGE_LABELS: Record<string, string> = {
-  EN: 'English',
-  SI: 'Sinhala',
-  TA: 'Tamil',
-  FR: 'French',
-  ES: 'Spanish',
-  DE: 'German',
+  en: 'English',
+  si: 'Sinhala',
+  ta: 'Tamil',
 }
 
-function toDisplayLanguage(value: string) {
+function normalizeLanguage(value: string) {
   const normalized = (value || '').trim()
-  if (!normalized) return 'English'
+  if (!normalized) return ''
   const upper = normalized.toUpperCase()
-  return LANGUAGE_LABELS[upper] || normalized
+  if (upper === 'EN' || upper === 'ENG' || upper === 'ENGLISH') return 'en'
+  if (upper === 'SI' || upper === 'SIN' || upper === 'SINHALA') return 'si'
+  if (upper === 'TA' || upper === 'TAM' || upper === 'TAMIL') return 'ta'
+  return normalized.toLowerCase()
 }
 
 export default function DonatePage() {
@@ -45,76 +51,80 @@ export default function DonatePage() {
   const [form, setForm] = useState({
     title: '',
     author: '',
+    description: '',
     category: 'Fiction',
     condition: 'Good',
-    description: '',
     location: user?.location || '',
     isbn: '',
-    language: 'English',
-    pages: '',
+    language: 'en',
     publishedYear: '',
-    tags: '',
+    publisher: '',
+    pages: '',
   })
 
-  if (!user) {
-    router.push('/auth/login')
-    return null
-  }
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
   const handleImage = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setImageFile(file)
-    setImagePreview(URL.createObjectURL(file))
+    setExternalImageUrl('')
+    const reader = new FileReader()
+    reader.onload = () => setImagePreview(reader.result as string)
+    reader.readAsDataURL(file)
   }
 
   const handleIsbnLookup = async (isbnValue = form.isbn) => {
     const normalized = isbnValue.replace(/[^0-9Xx]/g, '').toUpperCase()
-    if (!normalized) {
-      setError('Enter or scan an ISBN first')
+    if (!(normalized.length === 10 || normalized.length === 13)) {
+      setError('Enter a valid ISBN-10 or ISBN-13 to autofill metadata.')
       return
     }
 
-    setIsbnLoading(true)
     setError('')
     setAutofillMessage('')
+    setMetadataLookupDetails([])
+    setMetadataSource('')
+    setIsbnLoading(true)
+
     try {
       const { data } = await api.get(`/books/lookup/isbn/${normalized}`)
-      setForm(prev => ({
-        ...prev,
-        isbn: data.isbn || normalized,
-        title: data.title || prev.title,
-        author: data.author || prev.author,
-        description: data.description || prev.description,
-        language: data.language ? toDisplayLanguage(data.language) : prev.language,
-        pages: data.pages ? String(data.pages) : prev.pages,
-        publishedYear: data.publishedYear ? String(data.publishedYear) : prev.publishedYear,
-        category: data.category || prev.category,
-      }))
-      setMetadataLookupDetails(Array.isArray(data.lookupIssues) ? data.lookupIssues : [])
-      setMetadataSource(data.metadataSource || '')
-      setExternalImageUrl(data.image || '')
-      if (!imageFile && data.image) setImagePreview(data.image)
       const providers = [data.providers?.googleBooks ? 'Google Books' : null, data.providers?.openLibrary ? 'Open Library' : null].filter(Boolean)
-      setAutofillMessage(
-        providers.length
-          ? `Book details auto-filled from ${providers.join(' + ')}.`
-          : 'Book details auto-filled from the ISBN lookup.'
-      )
+      const normalizedLanguage = normalizeLanguage(data.book?.language || form.language || 'en')
+
+      setForm((prev) => ({
+        ...prev,
+        isbn: normalized,
+        title: data.book?.title || prev.title,
+        author: data.book?.author || prev.author,
+        description: data.book?.description || prev.description,
+        category: data.book?.category || prev.category,
+        language: normalizedLanguage || prev.language,
+        publishedYear: data.book?.publishedYear ? String(data.book.publishedYear) : prev.publishedYear,
+        publisher: data.book?.publisher || prev.publisher,
+        pages: data.book?.pages ? String(data.book.pages) : prev.pages,
+      }))
+
+      if (data.book?.image) {
+        setImagePreview(data.book.image)
+        setExternalImageUrl(data.book.image)
+        setImageFile(null)
+      }
+
+      setMetadataSource(providers.join(', '))
+      setMetadataLookupDetails(data.details || [])
+      setAutofillMessage(data.message || 'Book metadata filled successfully.')
     } catch (err: any) {
-      setMetadataLookupDetails(err.response?.data?.details || [])
-      setError(err.response?.data?.message || 'Could not fetch book metadata for that ISBN')
+      setError(err.response?.data?.message || 'Failed to fetch book metadata from ISBN.')
     } finally {
       setIsbnLoading(false)
     }
   }
 
   const handleDetectedIsbn = async (isbn: string) => {
-    setForm(prev => ({ ...prev, isbn }))
+    setForm((prev) => ({ ...prev, isbn }))
     await handleIsbnLookup(isbn)
   }
 
@@ -122,206 +132,190 @@ export default function DonatePage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    try {
-      if (!form.title || !form.author || !form.category || !form.condition) {
-        setError('Please fill in all required fields')
-        setLoading(false)
-        return
-      }
 
+    try {
       const fd = new FormData()
-      fd.append('title', form.title)
-      fd.append('author', form.author)
-      fd.append('category', form.category)
-      fd.append('condition', form.condition)
-      fd.append('description', form.description || '')
-      fd.append('location', form.location || '')
-      fd.append('isbn', form.isbn || '')
-      fd.append('language', form.language)
-      if (form.pages) fd.append('pages', form.pages)
-      if (form.publishedYear) fd.append('publishedYear', form.publishedYear)
-      fd.append('tags', form.tags || '')
-      if (!imageFile && externalImageUrl) fd.append('externalImageUrl', externalImageUrl)
-      if (imageFile) fd.append('image', imageFile)
+      Object.entries(form).forEach(([key, value]) => fd.append(key, value))
+      if (imageFile) {
+        fd.append('image', imageFile)
+      } else if (externalImageUrl) {
+        fd.append('externalImageUrl', externalImageUrl)
+      }
 
       const { data } = await api.post('/books', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
       router.push(`/books/${data._id}`)
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to list book')
+      setError(err.response?.data?.message || 'Failed to create book listing')
     } finally {
       setLoading(false)
     }
   }
 
+  if (!user) {
+    return (
+      <div className="page-shell">
+        <Navbar />
+        <main className="mx-auto max-w-4xl px-3 py-16 sm:px-6">
+          <Card className="rounded-[2rem] text-center">
+            <CardContent className="p-10">
+              <h1 className="text-3xl font-semibold">Sign in to donate books</h1>
+              <p className="mt-3 text-sm leading-7 text-muted-foreground">Creating polished listings is part of the redesigned donor experience.</p>
+              <Button asChild className="mt-6 rounded-full"><Link href="/auth/login">Go to login</Link></Button>
+            </CardContent>
+          </Card>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="page-shell">
       <Navbar />
-      <div className="max-w-2xl mx-auto px-4 py-10">
-        <Link href="/books" className="inline-flex items-center gap-2 text-gray-500 hover:text-blue-600 mb-8 transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Back to Books
-        </Link>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Donate a Book</h1>
-          <p className="text-gray-500 mb-8">Share a book with someone who needs it</p>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="rounded-3xl border border-blue-100 bg-blue-50/80 dark:bg-blue-950/30 dark:border-blue-900 px-5 py-5">
-              <div className="flex items-start justify-between gap-4 flex-col sm:flex-row">
-                <div>
-                  <div className="inline-flex items-center gap-2 text-sm font-semibold text-blue-700 dark:text-blue-300 mb-2">
-                    <Sparkles className="w-4 h-4" /> ISBN Smart Autofill
-                  </div>
-                  <p className="text-sm text-blue-900/80 dark:text-blue-100/80">
-                    Type or scan an ISBN to auto-fill the cover image, description, page count, published year, and ISBN using Google Books with Open Library as fallback.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-4 grid sm:grid-cols-[1fr_auto_auto] gap-3">
-                <input
-                  name="isbn"
-                  value={form.isbn}
-                  onChange={handleChange}
-                  placeholder="Enter or paste ISBN"
-                  className="w-full border border-blue-200 dark:border-blue-800 rounded-2xl px-4 py-3 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => handleIsbnLookup()}
-                  disabled={isbnLoading}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 text-white px-4 py-3 font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60"
-                >
-                  {isbnLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                  Autofill
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setScannerOpen(true)}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-blue-200 dark:border-blue-800 px-4 py-3 font-semibold text-blue-700 dark:text-blue-300 hover:bg-white/80 dark:hover:bg-gray-900 transition-colors"
-                >
-                  <ScanLine className="w-4 h-4" /> Scan ISBN
-                </button>
-              </div>
-
-              {autofillMessage && (
-                <div className="mt-4 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                  {autofillMessage}
-                  {metadataSource ? <span className="block text-xs text-green-600 mt-1">Source: {metadataSource.replace(/_/g, ' ')}</span> : null}
-                </div>
-              )}
-
-              {!!metadataLookupDetails.length && !autofillMessage && (
-                <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                  <p className="font-medium mb-1">Lookup notes</p>
-                  <ul className="list-disc ml-5 space-y-1">
-                    {metadataLookupDetails.map(detail => <li key={detail}>{detail}</li>)}
-                  </ul>
-                </div>
-              )}
-            </div>
-
+      <main className="mx-auto max-w-[1920px] px-3 pb-10 pt-6 sm:px-6">
+        <section className="surface-card rounded-[2rem] p-6 sm:p-8">
+          <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Book Cover Image</label>
-              <label className="block cursor-pointer">
-                <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-2xl overflow-hidden hover:border-blue-400 transition-colors">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Donor workspace</p>
+              <h1 className="mt-3 text-3xl font-semibold text-balance sm:text-5xl">Create a premium book listing with richer metadata and cleaner inputs.</h1>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
+                Autofill details from ISBN, upload a polished cover preview, and publish a card that feels at home in the new catalog experience.
+              </p>
+            </div>
+            <Card className="rounded-[1.75rem] border-border/60 bg-primary text-primary-foreground shadow-none">
+              <CardContent className="space-y-4 p-6">
+                <div className="inline-flex rounded-full bg-white/15 px-4 py-1.5 text-sm font-medium">Fast listing flow</div>
+                <p className="text-2xl font-semibold">Metadata + media + trust</p>
+                <p className="text-sm text-primary-foreground/80">The form now guides donors through the complete creation flow on both desktop and mobile.</p>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        <form onSubmit={handleSubmit} className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
+          <div className="space-y-6">
+            <Card className="rounded-[2rem]">
+              <CardHeader>
+                <CardTitle>Book details</CardTitle>
+                <CardDescription>Capture the information readers need to decide quickly.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-5 sm:grid-cols-2">
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="title">Title</Label>
+                  <Input id="title" name="title" value={form.title} onChange={handleChange} placeholder="Atomic Habits" required />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="author">Author</Label>
+                  <Input id="author" name="author" value={form.author} onChange={handleChange} placeholder="James Clear" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category</Label>
+                  <select id="category" name="category" value={form.category} onChange={handleChange} className="flex h-11 w-full rounded-xl border border-input bg-background/80 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                    {CATEGORIES.map((item) => <option key={item} value={item}>{item}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="condition">Condition</Label>
+                  <select id="condition" name="condition" value={form.condition} onChange={handleChange} className="flex h-11 w-full rounded-xl border border-input bg-background/80 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                    {CONDITIONS.map((item) => <option key={item} value={item}>{item}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="location">Pickup location</Label>
+                  <Input id="location" name="location" value={form.location} onChange={handleChange} placeholder="Colombo" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="language">Language</Label>
+                  <select id="language" name="language" value={form.language} onChange={handleChange} className="flex h-11 w-full rounded-xl border border-input bg-background/80 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                    {Object.entries(LANGUAGE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="publishedYear">Published year</Label>
+                  <Input id="publishedYear" name="publishedYear" value={form.publishedYear} onChange={handleChange} placeholder="2023" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="publisher">Publisher</Label>
+                  <Input id="publisher" name="publisher" value={form.publisher} onChange={handleChange} placeholder="Publisher name" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pages">Pages</Label>
+                  <Input id="pages" name="pages" value={form.pages} onChange={handleChange} placeholder="320" />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea id="description" name="description" value={form.description} onChange={handleChange} placeholder="Describe the condition, notes, and who this book is ideal for." />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-[2rem]">
+              <CardHeader>
+                <CardTitle>ISBN autofill</CardTitle>
+                <CardDescription>Use metadata providers to save time and standardize listings.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-[1fr_auto_auto]">
+                  <div className="space-y-2">
+                    <Label htmlFor="isbn">ISBN</Label>
+                    <Input id="isbn" name="isbn" value={form.isbn} onChange={handleChange} placeholder="978..." />
+                  </div>
+                  <Button type="button" variant="outline" onClick={() => handleIsbnLookup()} className="self-end rounded-xl">
+                    {isbnLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                    Autofill
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => setScannerOpen(true)} className="self-end rounded-xl">
+                    <ScanLine className="mr-2 h-4 w-4" /> Scan ISBN
+                  </Button>
+                </div>
+                {autofillMessage ? <div className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">{autofillMessage}</div> : null}
+                {metadataSource ? <p className="text-sm text-muted-foreground">Metadata source: {metadataSource}</p> : null}
+                {metadataLookupDetails.length ? (
+                  <ul className="space-y-2 text-sm text-muted-foreground">
+                    {metadataLookupDetails.map((detail) => <li key={detail} className="rounded-xl bg-muted/70 px-3 py-2">{detail}</li>)}
+                  </ul>
+                ) : null}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-6 lg:sticky lg:top-28 h-fit">
+            <Card className="rounded-[2rem]">
+              <CardHeader>
+                <CardTitle>Cover preview</CardTitle>
+                <CardDescription>Add a polished image for the redesigned listing card.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <label className="flex cursor-pointer flex-col items-center justify-center rounded-[1.75rem] border border-dashed border-border/80 bg-muted/40 px-6 py-10 text-center transition hover:border-primary/40 hover:bg-primary/5">
                   {imagePreview ? (
-                    <img src={imagePreview} alt="Preview" className="w-full h-56 object-cover" />
+                    <img src={imagePreview} alt="Book preview" className="mb-4 aspect-[4/5] w-full rounded-[1.5rem] object-cover" />
                   ) : (
-                    <div className="h-40 flex flex-col items-center justify-center text-gray-400 gap-2">
-                      <Upload className="w-8 h-8" />
-                      <span className="text-sm">Upload your own cover or use ISBN autofill</span>
+                    <div className="mb-4 rounded-2xl bg-primary/10 p-4 text-primary">
+                      <UploadCloud className="h-8 w-8" />
                     </div>
                   )}
+                  <p className="font-medium">{imagePreview ? 'Change cover image' : 'Upload cover image'}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">PNG or JPG files work best for the new card design.</p>
+                  <input type="file" accept="image/*" onChange={handleImage} className="hidden" />
+                </label>
+
+                <div className="rounded-[1.5rem] bg-muted/70 p-4 text-sm text-muted-foreground">
+                  Your listing card will automatically pick up any uploaded cover or ISBN-sourced image.
                 </div>
-                <input type="file" accept="image/*" className="hidden" onChange={handleImage} />
-              </label>
-              {externalImageUrl && !imageFile ? (
-                <p className="text-xs text-gray-500 mt-2">Using cover from metadata lookup. Upload a file above to override it.</p>
-              ) : null}
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Book Title *</label>
-                <input name="title" value={form.title} onChange={handleChange} required
-                  placeholder="e.g. The Great Gatsby"
-                  className="w-full border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
+                {error ? <div className="rounded-[1.5rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">{error}</div> : null}
 
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Author *</label>
-                <input name="author" value={form.author} onChange={handleChange} required
-                  placeholder="e.g. F. Scott Fitzgerald"
-                  className="w-full border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
+                <Button type="submit" disabled={loading} className="w-full rounded-xl">
+                  {loading ? 'Publishing...' : 'Publish listing'}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </form>
+      </main>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category *</label>
-                <select name="category" value={form.category} onChange={handleChange}
-                  className="w-full border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Condition *</label>
-                <select name="condition" value={form.condition} onChange={handleChange}
-                  className="w-full border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  {CONDITIONS.map(c => <option key={c}>{c}</option>)}
-                </select>
-              </div>
-
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
-                <textarea name="description" value={form.description} onChange={handleChange} rows={4}
-                  placeholder="Tell us about the book..."
-                  className="w-full border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Language</label>
-                <input name="language" value={form.language} onChange={handleChange}
-                  className="w-full border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pages</label>
-                <input name="pages" value={form.pages} onChange={handleChange} type="number" placeholder="e.g. 320"
-                  className="w-full border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Published Year</label>
-                <input name="publishedYear" value={form.publishedYear} onChange={handleChange} type="number" placeholder="e.g. 2005"
-                  className="w-full border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Your Location</label>
-                <input name="location" value={form.location} onChange={handleChange} placeholder="City, Country"
-                  className="w-full border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tags (comma-separated)</label>
-                <input name="tags" value={form.tags} onChange={handleChange} placeholder="e.g. classic, novel, english"
-                  className="w-full border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-            </div>
-
-            {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{error}</div>}
-
-            <button type="submit" disabled={loading}
-              className="w-full bg-blue-600 text-white font-semibold py-3.5 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-              <BookOpen className="w-5 h-5" />
-              {loading ? 'Listing Book...' : 'Donate This Book'}
-            </button>
-          </form>
-        </motion.div>
-      </div>
-      <Footer />
       <IsbnScannerModal open={scannerOpen} onClose={() => setScannerOpen(false)} onDetected={handleDetectedIsbn} />
+      <Footer />
     </div>
   )
 }

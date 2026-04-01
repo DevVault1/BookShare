@@ -1,20 +1,23 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+
+import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
-  BookOpen,
-  Heart,
-  CheckCircle,
-  Plus,
+  BarChart3,
   Bell,
-  Truck,
+  BookOpen,
+  CheckCircle,
+  Compass,
+  Heart,
+  LayoutDashboard,
+  MessageCircle,
+  Plus,
   ShieldCheck,
   Star,
-  BarChart3,
-  Compass,
-  MapPinned,
-  MessageCircle,
+  Truck,
 } from 'lucide-react'
+
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import BookCard from '@/components/books/BookCard'
@@ -22,21 +25,32 @@ import ReviewForm from '@/components/reviews/ReviewForm'
 import StarDisplay from '@/components/reviews/StarDisplay'
 import ImpactMap from '@/components/analytics/ImpactMap'
 import TrendBars from '@/components/analytics/TrendBars'
+import TwoFactorSetupCard from '@/components/auth/TwoFactorSetupCard'
 import api from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { cn, getStatusColor, formatDate, formatRating } from '@/lib/utils'
+import { cn, formatDate, formatRating, getStatusColor } from '@/lib/utils'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import TwoFactorSetupCard from '@/components/auth/TwoFactorSetupCard'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Skeleton } from '@/components/ui/skeleton'
+
+const tabs = [
+  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+  { id: 'my-books', label: 'My books', icon: BookOpen },
+  { id: 'requests', label: 'Requests', icon: Heart },
+  { id: 'donations', label: 'Donations', icon: Truck },
+  { id: 'notifications', label: 'Notifications', icon: Bell },
+  { id: 'security', label: 'Security', icon: ShieldCheck },
+]
 
 export default function DashboardPage() {
   const { user, fetchMe } = useAuthStore()
   const router = useRouter()
-  const [tab, setTab] = useState('overview')
+  const searchParams = useSearchParams()
+  const [tab, setTab] = useState(searchParams.get('tab') || 'overview')
   const [myBooks, setMyBooks] = useState<any[]>([])
   const [myRequests, setMyRequests] = useState<any[]>([])
   const [donorRequests, setDonorRequests] = useState<any[]>([])
@@ -56,6 +70,13 @@ export default function DashboardPage() {
     fetchAll()
   }, [user, router])
 
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab')
+    if (requestedTab && tabs.some((item) => item.id === requestedTab)) {
+      setTab(requestedTab)
+    }
+  }, [searchParams])
+
   const fetchAll = async () => {
     setLoading(true)
     try {
@@ -74,8 +95,9 @@ export default function DashboardPage() {
       setNotifications(notifRes.data)
       setAnalytics(analyticsRes.data)
       await fetchMe()
-    } catch (err) {
-      console.error(err)
+      setActionError('')
+    } catch (error) {
+      console.error(error)
       setActionError('Failed to load dashboard data.')
     } finally {
       setLoading(false)
@@ -153,6 +175,7 @@ export default function DashboardPage() {
     monthlyTrend: [],
     recentBooks: [],
   }
+
   const donorAnalytics = analytics?.donorImpactAnalytics || {
     totalBooksShared: 0,
     studentsReached: 0,
@@ -166,452 +189,405 @@ export default function DashboardPage() {
   }
 
   const stats = [
-    { label: 'Books Donated', value: myBooks.length, icon: BookOpen, color: 'bg-blue-50 text-blue-600' },
-    { label: 'Requests Sent', value: myRequests.length, icon: Heart, color: 'bg-rose-50 text-rose-600' },
-    { label: 'Books Adopted', value: donations.filter((d: any) => d.receiverId?._id === user?._id).length, icon: CheckCircle, color: 'bg-green-50 text-green-600' },
-    { label: 'Reviews Pending', value: donations.filter((d: any) => d.receiverId?._id === user?._id && ['delivered', 'confirmed'].includes(d.status) && !d.reviewId).length, icon: Star, color: 'bg-amber-50 text-amber-600' },
+    { label: 'Books donated', value: myBooks.length, icon: BookOpen },
+    { label: 'Requests sent', value: myRequests.length, icon: Heart },
+    { label: 'Books adopted', value: donations.filter((item: any) => item.receiverId?._id === user?._id).length, icon: CheckCircle },
+    { label: 'Unread alerts', value: notifications.filter((item: any) => !item.isRead).length, icon: Bell },
   ]
 
-  const tabs = ['overview', 'analytics', 'security', 'my-books', 'requests', 'donations', 'notifications']
-  const unreadNotifications = notifications.filter((n: any) => !n.isRead).length
+  const initials = user.name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase()
+
+  const quickActionCards = useMemo(
+    () => [
+      {
+        title: 'Start a donation',
+        description: 'Create a polished listing with cover preview, metadata, and stronger trust signals.',
+        href: '/books/donate',
+        icon: Plus,
+      },
+      {
+        title: 'Browse the catalog',
+        description: 'Jump into curated categories and discover which books are trending right now.',
+        href: '/books',
+        icon: Compass,
+      },
+      {
+        title: 'Open messages',
+        description: 'Continue donor or reader conversations from the new chat workspace.',
+        href: '/dashboard/chat',
+        icon: MessageCircle,
+      },
+    ],
+    []
+  )
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="page-shell">
       <Navbar />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Hello, {user?.name?.split(' ')[0]}! 👋</h1>
-            <p className="text-gray-500 mt-1 capitalize">{user?.role} account · {user?.location || 'No location set'}</p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Button asChild variant="outline" className="rounded-xl">
-              <Link href="/dashboard/chat">
-                <MessageCircle className="mr-2 h-4 w-4" /> Chat
-              </Link>
-            </Button>
-            <Button asChild className="rounded-xl">
-              <Link href="/books/donate">
-                <Plus className="mr-2 h-4 w-4" /> Donate a Book
-              </Link>
-            </Button>
-          </div>
-        </div>
-
-        {!!user?.donorReputation?.overallScore && (
-          <div className="mb-8 bg-white dark:bg-gray-900 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <main className="mx-auto max-w-[1920px] px-3 pb-10 pt-6 sm:px-6">
+        <section className="surface-card rounded-[2rem] p-6 sm:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-4">
+              <Avatar className="h-16 w-16">
+                <AvatarImage src={user.profileImage} alt={user.name} />
+                <AvatarFallback>{initials}</AvatarFallback>
+              </Avatar>
               <div>
-                <Badge variant="secondary" className="mb-3 inline-flex gap-2 bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
-                  <ShieldCheck className="h-4 w-4" /> Donor reputation live
-                </Badge>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Your current donor score is {formatRating(user.donorReputation.overallScore)} / 5</h2>
-                <p className="text-sm text-gray-500 mt-1">Calculated from response speed, receiver feedback, and how accurately your book descriptions match reality.</p>
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">{user.role} workspace</p>
+                <h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Welcome back, {user.name.split(' ')[0]}.</h1>
+                <p className="mt-2 text-sm leading-7 text-muted-foreground">{user.location || 'Add your location'} · Premium dashboard with analytics, trust, and messaging.</p>
               </div>
-              <div className="grid grid-cols-3 gap-3 text-sm min-w-full md:min-w-[360px]">
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-xl px-3 py-3">
-                  <p className="text-gray-500 mb-1">Response</p>
-                  <p className="font-bold text-gray-900 dark:text-white">{formatRating(user.donorReputation.responseSpeedScore)}</p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button asChild variant="outline" className="rounded-full">
+                <Link href="/dashboard/chat"><MessageCircle className="mr-2 h-4 w-4" /> Chat</Link>
+              </Button>
+              <Button asChild className="rounded-full">
+                <Link href="/books/donate"><Plus className="mr-2 h-4 w-4" /> Donate a book</Link>
+              </Button>
+            </div>
+          </div>
+
+          {!!user.donorReputation?.overallScore ? (
+            <div className="mt-6 rounded-[1.75rem] border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <Badge variant="secondary" className="rounded-full bg-white/70 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                    <ShieldCheck className="mr-1 h-3.5 w-3.5" /> Donor reputation live
+                  </Badge>
+                  <h2 className="mt-3 text-xl font-semibold">Your donor score is {formatRating(user.donorReputation.overallScore)} / 5</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Powered by response speed, receiver feedback, and book description accuracy.</p>
                 </div>
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-xl px-3 py-3">
-                  <p className="text-gray-500 mb-1">Accuracy</p>
-                  <p className="font-bold text-gray-900 dark:text-white">{formatRating(user.donorReputation.accuracyScore)}</p>
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-xl px-3 py-3">
-                  <p className="text-gray-500 mb-1">Feedback</p>
-                  <p className="font-bold text-gray-900 dark:text-white">{formatRating(user.donorReputation.receiverFeedbackScore)}</p>
+                <div className="grid min-w-full gap-3 sm:grid-cols-3 lg:min-w-[380px]">
+                  <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/40">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Response</p>
+                    <p className="mt-2 text-lg font-semibold">{formatRating(user.donorReputation.responseSpeedScore)}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/40">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Accuracy</p>
+                    <p className="mt-2 text-lg font-semibold">{formatRating(user.donorReputation.accuracyScore)}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/40">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Feedback</p>
+                    <p className="mt-2 text-lg font-semibold">{formatRating(user.donorReputation.receiverFeedbackScore)}</p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          ) : null}
+        </section>
 
-        {(actionMessage || actionError) && (
-          <div className={cn('mb-6 rounded-2xl px-4 py-3 text-sm border', actionMessage ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200')}>
+        {actionMessage || actionError ? (
+          <div className={cn('mt-6 rounded-[1.5rem] border px-4 py-3 text-sm', actionMessage ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300' : 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300')}>
             {actionMessage || actionError}
           </div>
-        )}
+        ) : null}
 
-        <div className="grid grid-cols-2 gap-4 mb-8 md:grid-cols-4">
-          {stats.map((stat, i) => (
-            <motion.div key={stat.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-              <Card className="rounded-2xl">
-                <CardHeader className="pb-3">
-                  <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl', stat.color)}>
-                    <stat.icon className="h-5 w-5" />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">{stat.value}</div>
-                  <div className="mt-0.5 text-sm text-gray-500">{stat.label}</div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
+        <section className="mt-6 grid gap-6 lg:grid-cols-[260px_1fr]">
+          <aside className="space-y-4 lg:sticky lg:top-28 h-fit">
+            <Card className="rounded-[1.75rem]">
+              <CardHeader>
+                <CardTitle className="text-base">Workspace</CardTitle>
+                <CardDescription>Move between dashboard sections with a clearer information hierarchy.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {tabs.map((item) => {
+                  const Icon = item.icon
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setTab(item.id)}
+                      className={cn('flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium transition', tab === item.id ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' : 'bg-background text-muted-foreground hover:bg-accent hover:text-foreground')}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </button>
+                  )
+                })}
+              </CardContent>
+            </Card>
 
-        <Tabs value={tab} onValueChange={setTab} className="mb-8">
-          <TabsList className="h-auto flex-wrap justify-start gap-1 rounded-xl p-1">
-            {tabs.map((t) => (
-              <TabsTrigger key={t} value={t} className="capitalize">
-                {t.replace('-', ' ')}
-                {t === 'notifications' && unreadNotifications > 0 ? (
-                  <Badge variant="secondary" className="ml-2">{unreadNotifications}</Badge>
-                ) : null}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-
-        {loading ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-            {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-60 bg-gray-200 dark:bg-gray-800 rounded-2xl animate-pulse" />)}
-          </div>
-        ) : (
-          <>
-            {tab === 'overview' && (
-              <div className="space-y-8">
-                <div className="grid gap-6 lg:grid-cols-2">
-                  <Card className="rounded-2xl">
-                    <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+            <div className="grid gap-4">
+              {stats.map((item) => {
+                const Icon = item.icon
+                return (
+                  <Card key={item.label} className="rounded-[1.5rem] shadow-none">
+                    <CardContent className="flex items-center gap-3 p-4">
+                      <div className="rounded-2xl bg-primary/10 p-3 text-primary">
+                        <Icon className="h-4 w-4" />
+                      </div>
                       <div>
-                        <Badge variant="secondary" className="mb-3 bg-blue-100 text-blue-800 hover:bg-blue-100">Reading analytics</Badge>
-                        <CardTitle className="text-xl">You've adopted {studentAnalytics.adoptedThisYear} books this year</CardTitle>
-                        <CardDescription className="mt-2">Favourite category: <span className="font-semibold text-foreground">{studentAnalytics.favouriteCategory}</span></CardDescription>
-                      </div>
-                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-                        <Compass className="h-5 w-5" />
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-3 gap-3 text-sm">
-                        <Card className="bg-muted/40 shadow-none"><CardContent className="px-3 py-3"><p className="text-muted-foreground">Total adopted</p><p className="text-xl font-bold">{studentAnalytics.totalAdoptedBooks}</p></CardContent></Card>
-                        <Card className="bg-muted/40 shadow-none"><CardContent className="px-3 py-3"><p className="text-muted-foreground">This month</p><p className="text-xl font-bold">{studentAnalytics.adoptedThisMonth}</p></CardContent></Card>
-                        <Card className="bg-muted/40 shadow-none"><CardContent className="px-3 py-3"><p className="text-muted-foreground">Top authors</p><p className="text-xl font-bold">{studentAnalytics.topAuthors.length}</p></CardContent></Card>
-                      </div>
-                      <div className="mt-4">
-                        <TrendBars title="Adoptions this year" subtitle="Monthly completed adoptions" data={studentAnalytics.monthlyTrend} />
+                        <p className="text-sm text-muted-foreground">{item.label}</p>
+                        <p className="text-xl font-semibold">{item.value}</p>
                       </div>
                     </CardContent>
                   </Card>
+                )
+              })}
+            </div>
+          </aside>
 
-                  <Card className="rounded-2xl">
-                    <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-                      <div>
-                        <Badge variant="secondary" className="mb-3 bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Donor impact</Badge>
-                        <CardTitle className="text-xl">Your books have reached {donorAnalytics.studentsReached} students across {donorAnalytics.citiesReached} cities</CardTitle>
-                        <CardDescription className="mt-2">Favourite shared category: <span className="font-semibold text-foreground">{donorAnalytics.favouriteSharedCategory}</span></CardDescription>
-                      </div>
-                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
-                        <MapPinned className="h-5 w-5" />
-                      </div>
+          <section className="space-y-6">
+            {loading ? (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-44 w-full rounded-[1.75rem]" />)}
+              </div>
+            ) : null}
+
+            {!loading && tab === 'overview' ? (
+              <div className="space-y-6">
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  {stats.map((item) => {
+                    const Icon = item.icon
+                    return (
+                      <Card key={item.label} className="rounded-[1.75rem]">
+                        <CardContent className="p-5">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm text-muted-foreground">{item.label}</p>
+                              <p className="mt-2 text-3xl font-semibold">{item.value}</p>
+                            </div>
+                            <div className="rounded-2xl bg-primary/10 p-3 text-primary"><Icon className="h-5 w-5" /></div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                </div>
+
+                <div className="grid gap-5 xl:grid-cols-3">
+                  {quickActionCards.map((item) => {
+                    const Icon = item.icon
+                    return (
+                      <Card key={item.title} className="rounded-[1.75rem]">
+                        <CardContent className="p-6">
+                          <div className="mb-4 inline-flex rounded-2xl bg-primary/10 p-3 text-primary"><Icon className="h-5 w-5" /></div>
+                          <h3 className="text-lg font-semibold">{item.title}</h3>
+                          <p className="mt-2 text-sm leading-7 text-muted-foreground">{item.description}</p>
+                          <Button asChild variant="outline" className="mt-5 rounded-full">
+                            <Link href={item.href}>Open</Link>
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                </div>
+
+                <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+                  <Card className="rounded-[1.75rem]">
+                    <CardHeader>
+                      <CardTitle>Incoming requests</CardTitle>
+                      <CardDescription>Respond faster with a cleaner action list for donors.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="mb-4 grid grid-cols-3 gap-3 text-sm">
-                        <Card className="bg-muted/40 shadow-none"><CardContent className="px-3 py-3"><p className="text-muted-foreground">Books shared</p><p className="text-xl font-bold">{donorAnalytics.totalBooksShared}</p></CardContent></Card>
-                        <Card className="bg-muted/40 shadow-none"><CardContent className="px-3 py-3"><p className="text-muted-foreground">Students</p><p className="text-xl font-bold">{donorAnalytics.studentsReached}</p></CardContent></Card>
-                        <Card className="bg-muted/40 shadow-none"><CardContent className="px-3 py-3"><p className="text-muted-foreground">Cities</p><p className="text-xl font-bold">{donorAnalytics.citiesReached}</p></CardContent></Card>
-                      </div>
-                      <ImpactMap points={donorAnalytics.impactMap} />
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {donorRequests.filter((r: any) => r.status === 'pending').length > 0 && (
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">⏳ Pending Requests for Your Books</h2>
-                    <div className="space-y-3">
-                      {donorRequests.filter((r: any) => r.status === 'pending').slice(0, 3).map((req: any) => (
-                        <div key={req._id} className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800 flex items-center justify-between gap-4">
-                          <div>
-                            <p className="font-medium text-gray-900 dark:text-white">{req.requesterId?.name} wants <span className="text-blue-600">{req.bookId?.title}</span></p>
-                            {req.message && <p className="text-sm text-gray-500 mt-1">“{req.message}”</p>}
-                            <p className="text-xs text-gray-400 mt-1">{formatDate(req.requestDate)}</p>
-                          </div>
-                          <div className="flex gap-2">
-                            <button onClick={() => handleRequestResponse(req._id, 'approved')} className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors">Approve</button>
-                            <button onClick={() => handleRequestResponse(req._id, 'rejected')} className="px-3 py-1.5 bg-red-100 text-red-600 text-sm rounded-lg hover:bg-red-200 transition-colors">Decline</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">📚 Your Recent Books</h2>
-                  {myBooks.length === 0 ? (
-                    <div className="text-center py-10 text-gray-400 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800">
-                      <BookOpen className="w-10 h-10 mx-auto mb-3 text-gray-300" />
-                      <p>No books donated yet. <Link href="/books/donate" className="text-blue-600 hover:underline">Donate your first book!</Link></p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {myBooks.slice(0, 4).map((book: any) => <BookCard key={book._id} book={book} />)}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {tab === 'analytics' && (
-              <div className="space-y-8">
-                <div className="grid gap-6 lg:grid-cols-2">
-                  <div className="space-y-6">
-                    <Card>
-                      <CardHeader>
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-                            <BarChart3 className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <CardTitle className="text-lg">User reading analytics</CardTitle>
-                            <CardDescription>Track what you've adopted and what subjects you lean toward most.</CardDescription>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="mb-4 grid grid-cols-2 gap-3">
-                          <Card className="bg-muted/40 shadow-none"><CardContent className="px-4 py-4"><p className="text-sm text-muted-foreground">You've adopted</p><p className="text-3xl font-bold">{studentAnalytics.adoptedThisYear}</p><p className="mt-1 text-xs text-muted-foreground">books this year</p></CardContent></Card>
-                          <Card className="bg-muted/40 shadow-none"><CardContent className="px-4 py-4"><p className="text-sm text-muted-foreground">Favourite category</p><p className="text-xl font-bold">{studentAnalytics.favouriteCategory}</p><p className="mt-1 text-xs text-muted-foreground">based on your completed adoptions</p></CardContent></Card>
-                        </div>
-                        <TrendBars title="Reading trend" subtitle="Completed adoptions by month" data={studentAnalytics.monthlyTrend} />
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Category breakdown</CardTitle>
-                        <CardDescription>Your top adopted subjects at a glance.</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        {studentAnalytics.categoryBreakdown.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">No completed adoptions yet.</p>
-                        ) : (
-                          <div className="space-y-3">
-                            {studentAnalytics.categoryBreakdown.map((item: any) => {
-                              const width = Math.min(100, (item.count / Math.max(studentAnalytics.totalAdoptedBooks, 1)) * 100)
-                              return (
-                                <div key={item.label}>
-                                  <div className="mb-1 flex items-center justify-between text-sm">
-                                    <span>{item.label}</span>
-                                    <span className="text-muted-foreground">{item.count}</span>
-                                  </div>
-                                  <div className="h-2 rounded-full bg-muted">
-                                    <div className="h-2 rounded-full bg-primary" style={{ width: `${width}%` }} />
-                                  </div>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  <div className="space-y-6">
-                    <Card>
-                      <CardHeader>
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
-                            <MapPinned className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <CardTitle className="text-lg">Donor impact dashboard</CardTitle>
-                            <CardDescription>See how far your donated books travel and who they reach.</CardDescription>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="mb-4 grid grid-cols-3 gap-3">
-                          <Card className="bg-muted/40 shadow-none"><CardContent className="px-4 py-4"><p className="text-sm text-muted-foreground">Books shared</p><p className="text-2xl font-bold">{donorAnalytics.totalBooksShared}</p></CardContent></Card>
-                          <Card className="bg-muted/40 shadow-none"><CardContent className="px-4 py-4"><p className="text-sm text-muted-foreground">Students reached</p><p className="text-2xl font-bold">{donorAnalytics.studentsReached}</p></CardContent></Card>
-                          <Card className="bg-muted/40 shadow-none"><CardContent className="px-4 py-4"><p className="text-sm text-muted-foreground">Cities reached</p><p className="text-2xl font-bold">{donorAnalytics.citiesReached}</p></CardContent></Card>
-                        </div>
-                        <ImpactMap points={donorAnalytics.impactMap} />
-                      </CardContent>
-                    </Card>
-
-                    <TrendBars title="Sharing trend" subtitle="Completed deliveries by month" data={donorAnalytics.monthlyTrend} />
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Cities and latest recipients</CardTitle>
-                        <CardDescription>Where your reach is strongest and who received books most recently.</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <div className="space-y-3">
-                            {donorAnalytics.cityBreakdown.length === 0 ? (
-                              <p className="text-sm text-muted-foreground">No city data yet.</p>
-                            ) : donorAnalytics.cityBreakdown.slice(0, 5).map((item: any) => (
-                              <Card key={item.label} className="bg-muted/40 shadow-none">
-                                <CardContent className="flex items-center justify-between px-4 py-3">
-                                  <span className="text-sm">{item.label}</span>
-                                  <span className="text-sm font-semibold">{item.count}</span>
-                                </CardContent>
-                              </Card>
-                            ))}
-                          </div>
-                          <div className="space-y-3">
-                            {donorAnalytics.recentRecipients.length === 0 ? (
-                              <p className="text-sm text-muted-foreground">No completed deliveries yet.</p>
-                            ) : donorAnalytics.recentRecipients.map((item: any) => (
-                              <Card key={item.donationId} className="bg-muted/40 shadow-none">
-                                <CardContent className="px-4 py-3">
-                                  <p className="font-medium">{item.recipientName}</p>
-                                  <p className="text-sm text-muted-foreground">{item.title}</p>
-                                  <p className="mt-1 text-xs text-muted-foreground">{item.city} · {formatDate(item.deliveredAt)}</p>
-                                </CardContent>
-                              </Card>
-                            ))}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {tab === 'my-books' && (
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Your Donated Books ({myBooks.length})</h2>
-                  <Link href="/books/donate" className="text-sm text-blue-600 hover:underline">+ Add New</Link>
-                </div>
-                {myBooks.length === 0 ? (
-                  <div className="text-center py-16 text-gray-400 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800">
-                    <BookOpen className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                    <p>You haven't donated any books yet.</p>
-                    <Link href="/books/donate" className="mt-3 inline-block text-blue-600 hover:underline font-medium">Donate your first book</Link>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {myBooks.map((book: any) => <BookCard key={book._id} book={book} />)}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {tab === 'requests' && (
-              <div className="space-y-8">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Requests on Your Books</h2>
-                  {donorRequests.length === 0 ? <p className="text-gray-400">No requests yet.</p> : (
-                    <div className="space-y-3">
-                      {donorRequests.map((req: any) => (
-                        <div key={req._id} className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800">
-                          <div className="flex items-center justify-between gap-4">
-                            <div>
-                              <p className="font-medium text-gray-900 dark:text-white"><span className="text-blue-600">{req.requesterId?.name}</span> → {req.bookId?.title}</p>
-                              {req.message && <p className="text-sm text-gray-500 mt-1 italic">“{req.message}”</p>}
-                              <p className="text-xs text-gray-400 mt-1">{formatDate(req.requestDate)}</p>
-                            </div>
-                            <div className="flex items-center gap-2 flex-wrap justify-end">
-                              <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full', getStatusColor(req.status))}>{req.status}</span>
-                              {req.status === 'pending' && (
-                                <>
-                                  <button onClick={() => handleRequestResponse(req._id, 'approved')} className="px-3 py-1 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700">Approve</button>
-                                  <button onClick={() => handleRequestResponse(req._id, 'rejected')} className="px-3 py-1 bg-red-100 text-red-600 text-xs rounded-lg hover:bg-red-200">Decline</button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Your Book Requests</h2>
-                  {myRequests.length === 0 ? <p className="text-gray-400">You haven't requested any books.</p> : (
-                    <div className="space-y-3">
-                      {myRequests.map((req: any) => (
-                        <div key={req._id} className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800 flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-3">
-                            {req.bookId?.image && <img src={req.bookId.image} alt={req.bookId.title} className="w-12 h-16 object-cover rounded-lg" />}
-                            <div>
-                              <p className="font-medium text-gray-900 dark:text-white">{req.bookId?.title}</p>
-                              <p className="text-sm text-gray-500">{req.bookId?.author}</p>
-                              <p className="text-xs text-gray-400">{formatDate(req.requestDate)}</p>
-                            </div>
-                          </div>
-                          <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full', getStatusColor(req.status))}>{req.status}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {tab === 'donations' && (
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Donation History ({donations.length})</h2>
-                {donations.length === 0 ? <p className="text-gray-400 text-center py-16">No donations yet.</p> : (
-                  <div className="space-y-4">
-                    {donations.map((don: any) => {
-                      const isDonor = don.donorId?._id === user?._id
-                      const isReceiver = don.receiverId?._id === user?._id
-                      const canMarkDelivered = isDonor && don.status === 'pending'
-                      const canConfirmReceipt = isReceiver && don.status === 'delivered'
-                      const canManagePrivateReview = isReceiver && ['delivered', 'confirmed'].includes(don.status)
-
-                      return (
-                        <div key={don._id} className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800">
-                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                            <div>
-                              <p className="font-medium text-gray-900 dark:text-white">{don.bookId?.title}</p>
-                              <p className="text-sm text-gray-500">{isDonor ? `Given to ${don.receiverId?.name}` : `Received from ${don.donorId?.name}`}</p>
-                              <p className="text-xs text-gray-400 mt-1">{formatDate(don.donationDate)} · {don.deliveryMethod}</p>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                              <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full', getStatusColor(don.status))}>{don.status}</span>
-                              {canMarkDelivered && (
-                                <button onClick={() => handleDonationStatus(don._id, 'delivered')} className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">
-                                  <Truck className="w-4 h-4" /> Mark delivered
-                                </button>
-                              )}
-                              {canConfirmReceipt && (
-                                <button onClick={() => handleDonationStatus(don._id, 'confirmed')} className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition-colors">
-                                  <CheckCircle className="w-4 h-4" /> Confirm receipt
-                                </button>
-                              )}
-                              {canManagePrivateReview && (
-                                <button onClick={() => setActiveReviewDonationId(activeReviewDonationId === don._id ? null : don._id)} className="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-100 text-amber-700 text-sm rounded-lg hover:bg-amber-200 transition-colors">
-                                  <Star className="w-4 h-4" /> {activeReviewDonationId === don._id ? 'Hide review form' : don.reviewId ? 'Edit private review' : 'Leave private review'}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          {don.reviewId && (
-                            <div className="mt-4 rounded-2xl bg-gray-50 dark:bg-gray-800/70 p-4">
-                              <div className="flex flex-wrap items-center gap-3 justify-between mb-3">
+                      {donorRequests.length === 0 ? (
+                        <EmptyState icon={Heart} title="No incoming requests yet" description="When students request one of your books, the request will appear here." className="border-0 shadow-none" />
+                      ) : (
+                        <div className="space-y-3">
+                          {donorRequests.slice(0, 4).map((req: any) => (
+                            <div key={req._id} className="rounded-[1.5rem] border border-border/70 p-4">
+                              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
-                                  <p className="text-sm font-semibold text-gray-900 dark:text-white">Your submitted review</p>
-                                  <p className="text-xs text-gray-400">Added on {formatDate(don.reviewId.createdAt)}</p>
+                                  <p className="font-medium">{req.bookId?.title}</p>
+                                  <p className="text-sm text-muted-foreground">Requested by {req.studentId?.name} · {formatDate(req.requestDate)}</p>
                                 </div>
-                                <StarDisplay value={don.reviewId.bookRating} showValue />
-                              </div>
-                              {don.reviewId.reviewText && <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">“{don.reviewId.reviewText}”</p>}
-                              <div className="grid sm:grid-cols-2 gap-3 text-sm">
-                                <div className="bg-white dark:bg-gray-900 rounded-xl px-3 py-3">
-                                  <p className="text-gray-500 mb-1">Donor feedback</p>
-                                  <StarDisplay value={don.reviewId.donorFeedbackRating} size="sm" showValue />
-                                </div>
-                                <div className="bg-white dark:bg-gray-900 rounded-xl px-3 py-3">
-                                  <p className="text-gray-500 mb-1">Description accuracy</p>
-                                  <StarDisplay value={don.reviewId.descriptionAccuracyRating} size="sm" showValue />
+                                <div className="flex gap-2">
+                                  <Button size="sm" className="rounded-full" onClick={() => handleRequestResponse(req._id, 'approved')}>Approve</Button>
+                                  <Button size="sm" variant="outline" className="rounded-full" onClick={() => handleRequestResponse(req._id, 'rejected')}>Reject</Button>
                                 </div>
                               </div>
                             </div>
-                          )}
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
 
-                          {activeReviewDonationId === don._id && canManagePrivateReview && (
-                            <div className="mt-4">
+                  <Card className="rounded-[1.75rem]">
+                    <CardHeader>
+                      <CardTitle>Latest notifications</CardTitle>
+                      <CardDescription>Unread activity across requests, donations, and reviews.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {notifications.length === 0 ? (
+                        <EmptyState icon={Bell} title="No notifications yet" description="When important activity happens, the feed will light up here." className="border-0 shadow-none" />
+                      ) : (
+                        <div className="space-y-3">
+                          {notifications.slice(0, 5).map((item: any) => (
+                            <div key={item._id} className={cn('rounded-[1.5rem] border p-4 text-sm', item.isRead ? 'border-border/70 bg-background/60' : 'border-primary/20 bg-primary/5')}>
+                              <p>{item.message}</p>
+                              <p className="mt-2 text-xs text-muted-foreground">{formatDate(item.createdAt)}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            ) : null}
+
+            {!loading && tab === 'analytics' ? (
+              <div className="space-y-6">
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <Card className="rounded-[1.75rem]"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Books adopted</p><p className="mt-2 text-3xl font-semibold">{studentAnalytics.totalAdoptedBooks}</p></CardContent></Card>
+                  <Card className="rounded-[1.75rem]"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Adopted this year</p><p className="mt-2 text-3xl font-semibold">{studentAnalytics.adoptedThisYear}</p></CardContent></Card>
+                  <Card className="rounded-[1.75rem]"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Books shared</p><p className="mt-2 text-3xl font-semibold">{donorAnalytics.totalBooksShared}</p></CardContent></Card>
+                  <Card className="rounded-[1.75rem]"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Students reached</p><p className="mt-2 text-3xl font-semibold">{donorAnalytics.studentsReached}</p></CardContent></Card>
+                </div>
+
+                <div className="grid gap-6 xl:grid-cols-2">
+                  <TrendBars title="Reading trend" subtitle="Books adopted over time" data={studentAnalytics.monthlyTrend || []} />
+                  <TrendBars title="Donation trend" subtitle="Books shared over time" data={donorAnalytics.monthlyTrend || []} />
+                  <ImpactMap points={donorAnalytics.impactMap || []} />
+                  <Card className="rounded-[1.75rem]">
+                    <CardHeader>
+                      <CardTitle>Insight snapshot</CardTitle>
+                      <CardDescription>Categories and preferences based on your current activity.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="rounded-[1.5rem] bg-muted/70 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Favourite reading category</p>
+                        <p className="mt-2 text-lg font-semibold">{studentAnalytics.favouriteCategory}</p>
+                      </div>
+                      <div className="rounded-[1.5rem] bg-muted/70 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Favourite shared category</p>
+                        <p className="mt-2 text-lg font-semibold">{donorAnalytics.favouriteSharedCategory}</p>
+                      </div>
+                      <div className="rounded-[1.5rem] bg-muted/70 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Cities reached</p>
+                        <p className="mt-2 text-lg font-semibold">{donorAnalytics.citiesReached}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            ) : null}
+
+            {!loading && tab === 'my-books' ? (
+              myBooks.length === 0 ? (
+                <EmptyState icon={BookOpen} title="No listings yet" description="Publish your first book to see polished cards, request activity, and analytics here." action={<Button asChild><Link href="/books/donate">Create a listing</Link></Button>} />
+              ) : (
+                <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                  {myBooks.map((book: any) => <BookCard key={book._id} book={book} />)}
+                </div>
+              )
+            ) : null}
+
+            {!loading && tab === 'requests' ? (
+              <div className="grid gap-6 xl:grid-cols-2">
+                <Card className="rounded-[1.75rem]">
+                  <CardHeader>
+                    <CardTitle>Incoming requests</CardTitle>
+                    <CardDescription>Requests received for books you listed.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {donorRequests.length === 0 ? (
+                      <EmptyState icon={Heart} title="No incoming requests" description="Once a reader requests one of your books, it will appear here for approval." className="border-0 shadow-none" />
+                    ) : (
+                      <div className="space-y-3">
+                        {donorRequests.map((req: any) => (
+                          <div key={req._id} className="rounded-[1.5rem] border border-border/70 p-4">
+                            <div className="flex flex-col gap-3">
+                              <div className="flex items-center justify-between gap-3">
+                                <div>
+                                  <p className="font-medium">{req.bookId?.title}</p>
+                                  <p className="text-sm text-muted-foreground">{req.studentId?.name} · {formatDate(req.requestDate)}</p>
+                                </div>
+                                <span className={cn('rounded-full px-3 py-1 text-xs font-medium', getStatusColor(req.status))}>{req.status}</span>
+                              </div>
+                              {req.message ? <p className="text-sm text-muted-foreground">“{req.message}”</p> : null}
+                              {req.status === 'pending' ? (
+                                <div className="flex gap-2">
+                                  <Button size="sm" className="rounded-full" onClick={() => handleRequestResponse(req._id, 'approved')}>Approve</Button>
+                                  <Button size="sm" variant="outline" className="rounded-full" onClick={() => handleRequestResponse(req._id, 'rejected')}>Reject</Button>
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-[1.75rem]">
+                  <CardHeader>
+                    <CardTitle>My sent requests</CardTitle>
+                    <CardDescription>Books you have requested from donors.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {myRequests.length === 0 ? (
+                      <EmptyState icon={Compass} title="No requests sent" description="Explore the catalog and request a book to start tracking the exchange journey." className="border-0 shadow-none" />
+                    ) : (
+                      <div className="space-y-3">
+                        {myRequests.map((req: any) => (
+                          <div key={req._id} className="rounded-[1.5rem] border border-border/70 p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="font-medium">{req.bookId?.title}</p>
+                                <p className="text-sm text-muted-foreground">{req.bookId?.author} · {formatDate(req.requestDate)}</p>
+                              </div>
+                              <span className={cn('rounded-full px-3 py-1 text-xs font-medium', getStatusColor(req.status))}>{req.status}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            ) : null}
+
+            {!loading && tab === 'donations' ? (
+              donations.length === 0 ? (
+                <EmptyState icon={Truck} title="No donations yet" description="Delivered exchanges will appear here with status actions and private review controls." />
+              ) : (
+                <div className="space-y-4">
+                  {donations.map((don: any) => {
+                    const isDonor = don.donorId?._id === user?._id
+                    const isReceiver = don.receiverId?._id === user?._id
+                    const canMarkDelivered = isDonor && don.status === 'pending'
+                    const canConfirmReceipt = isReceiver && don.status === 'delivered'
+                    const canManagePrivateReview = isReceiver && ['delivered', 'confirmed'].includes(don.status)
+
+                    return (
+                      <Card key={don._id} className="rounded-[1.75rem]">
+                        <CardContent className="p-5">
+                          <div className="flex flex-col gap-4">
+                            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                              <div>
+                                <p className="text-lg font-semibold">{don.bookId?.title}</p>
+                                <p className="text-sm text-muted-foreground">{isDonor ? `Given to ${don.receiverId?.name}` : `Received from ${don.donorId?.name}`}</p>
+                                <p className="mt-1 text-xs text-muted-foreground">{formatDate(don.donationDate)} · {don.deliveryMethod}</p>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <span className={cn('rounded-full px-3 py-1 text-xs font-medium', getStatusColor(don.status))}>{don.status}</span>
+                                {canMarkDelivered ? <Button size="sm" className="rounded-full" onClick={() => handleDonationStatus(don._id, 'delivered')}><Truck className="mr-1 h-4 w-4" /> Mark delivered</Button> : null}
+                                {canConfirmReceipt ? <Button size="sm" className="rounded-full" onClick={() => handleDonationStatus(don._id, 'confirmed')}><CheckCircle className="mr-1 h-4 w-4" /> Confirm receipt</Button> : null}
+                                {canManagePrivateReview ? (
+                                  <Button size="sm" variant="outline" className="rounded-full" onClick={() => setActiveReviewDonationId(activeReviewDonationId === don._id ? null : don._id)}>
+                                    <Star className="mr-1 h-4 w-4" /> {activeReviewDonationId === don._id ? 'Hide review form' : don.reviewId ? 'Edit private review' : 'Leave private review'}
+                                  </Button>
+                                ) : null}
+                              </div>
+                            </div>
+
+                            {don.reviewId ? (
+                              <div className="rounded-[1.5rem] bg-muted/70 p-4">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                  <div>
+                                    <p className="text-sm font-semibold">Your submitted review</p>
+                                    <p className="text-xs text-muted-foreground">Added on {formatDate(don.reviewId.createdAt)}</p>
+                                  </div>
+                                  <StarDisplay value={don.reviewId.bookRating} showValue />
+                                </div>
+                                {don.reviewId.reviewText ? <p className="mt-3 text-sm text-muted-foreground">“{don.reviewId.reviewText}”</p> : null}
+                              </div>
+                            ) : null}
+
+                            {activeReviewDonationId === don._id && canManagePrivateReview ? (
                               <ReviewForm
                                 mode="private"
                                 initialValues={don.reviewId || undefined}
@@ -621,57 +597,64 @@ export default function DashboardPage() {
                                 submitLabel={don.reviewId ? 'Update private review' : 'Submit private review'}
                                 deleteLabel="Delete private review"
                               />
-                            </div>
-                          )}
+                            ) : null}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                </div>
+              )
+            ) : null}
+
+            {!loading && tab === 'notifications' ? (
+              notifications.length === 0 ? (
+                <EmptyState icon={Bell} title="No notifications" description="The redesigned activity feed will show requests, donation updates, and safety alerts here." />
+              ) : (
+                <div className="space-y-3">
+                  {notifications.map((item: any) => (
+                    <Card key={item._id} className={cn('rounded-[1.5rem]', item.isRead ? '' : 'border-primary/20 bg-primary/5')}>
+                      <CardContent className="flex items-start gap-3 p-4">
+                        <div className={cn('rounded-2xl p-2', item.isRead ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary')}>
+                          <Bell className="h-4 w-4" />
                         </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
+                        <div>
+                          <p className="text-sm leading-7">{item.message}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{formatDate(item.createdAt)}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )
+            ) : null}
 
-
-            {tab === 'security' && (
+            {!loading && tab === 'security' ? (
               <div className="space-y-6">
                 <TwoFactorSetupCard user={user} onUpdated={fetchAll} />
-                <Card>
+                <Card className="rounded-[1.75rem]">
                   <CardHeader>
-                    <CardTitle className="text-lg">Trust & safety shortcuts</CardTitle>
-                    <CardDescription>Use these tools whenever you spot a suspicious listing, unsafe conversation, or fake profile.</CardDescription>
+                    <CardTitle>Trust & safety shortcuts</CardTitle>
+                    <CardDescription>Use these tools whenever you notice suspicious activity or want stronger account protection.</CardDescription>
                   </CardHeader>
                   <CardContent className="grid gap-4 md:grid-cols-3">
-                    <Card className="bg-muted/40 shadow-none"><CardContent className="px-4 py-4"><p className="text-sm font-semibold">Report fake listings</p><p className="mt-1 text-sm text-muted-foreground">Open any book page and use the report button to alert admins.</p></CardContent></Card>
-                    <Card className="bg-muted/40 shadow-none"><CardContent className="px-4 py-4"><p className="text-sm font-semibold">Secure sign-in</p><p className="mt-1 text-sm text-muted-foreground">Enable email or SMS OTP to add a second step each time you log in.</p></CardContent></Card>
-                    <Card className="bg-muted/40 shadow-none"><CardContent className="px-4 py-4"><p className="text-sm font-semibold">Faster onboarding</p><p className="mt-1 text-sm text-muted-foreground">Use Google or Facebook login from the sign-in screen when OAuth is configured.</p></CardContent></Card>
+                    {[
+                      { title: 'Report fake listings', desc: 'Open any book page and use the report action to alert admins quickly.' },
+                      { title: 'Secure sign-in', desc: 'Enable email or SMS OTP to add a second step every time you log in.' },
+                      { title: 'Faster onboarding', desc: 'Use Google or Facebook login when OAuth is configured for your deployment.' },
+                    ].map((item) => (
+                      <div key={item.title} className="rounded-[1.5rem] bg-muted/70 p-4">
+                        <p className="text-sm font-semibold">{item.title}</p>
+                        <p className="mt-2 text-sm leading-7 text-muted-foreground">{item.desc}</p>
+                      </div>
+                    ))}
                   </CardContent>
                 </Card>
               </div>
-            )}
-
-            {tab === 'notifications' && (
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Notifications</h2>
-                {notifications.length === 0 ? <p className="text-gray-400 text-center py-16">No notifications yet.</p> : (
-                  <div className="space-y-2">
-                    {notifications.map((n: any) => (
-                      <div key={n._id} className={cn('bg-white dark:bg-gray-900 rounded-xl p-4 border transition-colors', n.isRead ? 'border-gray-100 dark:border-gray-800' : 'border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-900/10')}>
-                        <div className="flex items-start gap-3">
-                          <Bell className={cn('w-5 h-5 mt-0.5 flex-shrink-0', n.isRead ? 'text-gray-400' : 'text-blue-600')} />
-                          <div>
-                            <p className="text-sm text-gray-700 dark:text-gray-300">{n.message}</p>
-                            <p className="text-xs text-gray-400 mt-1">{formatDate(n.createdAt)}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </>
-        )}
-      </div>
+            ) : null}
+          </section>
+        </section>
+      </main>
       <Footer />
     </div>
   )
