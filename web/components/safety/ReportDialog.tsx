@@ -1,8 +1,14 @@
-'use client'
+"use client"
 
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Flag, X } from 'lucide-react'
+import { AlertTriangle, Flag } from 'lucide-react'
+
 import api from '@/lib/api'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 
 const categories = [
   { value: 'fake_listing', label: 'Fake listing' },
@@ -45,8 +51,6 @@ export default function ReportDialog({
     }
   }, [initialCategory, open])
 
-  if (!open) return null
-
   const handleSubmit = async () => {
     setLoading(true)
     setError('')
@@ -68,74 +72,56 @@ export default function ReportDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-start justify-between border-b px-6 py-5">
-          <div>
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
-              <Flag className="h-3.5 w-3.5" /> Report safety issue
-            </div>
-            <h3 className="text-lg font-bold text-gray-900">Report {targetLabel}</h3>
-            <p className="mt-1 text-sm text-gray-500">Admins will review this report and receive an email alert.</p>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <div className="inline-flex w-fit items-center gap-2 rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-300">
+            <Flag className="h-3.5 w-3.5" /> Report safety issue
           </div>
-          <button onClick={() => onOpenChange(false)} className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+          <DialogTitle>Report {targetLabel}</DialogTitle>
+          <DialogDescription>Admins will review this report and receive an alert. Share enough context to help them act quickly.</DialogDescription>
+        </DialogHeader>
 
-        <div className="space-y-4 px-6 py-5">
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Reason</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-500">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="reason">Reason</Label>
+            <select id="reason" value={category} onChange={(e) => setCategory(e.target.value)} className="flex h-11 w-full rounded-xl border border-input bg-background/80 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
               {categories.map((item) => (
                 <option key={item.value} value={item.value}>{item.label}</option>
               ))}
             </select>
           </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Priority</label>
-            <select value={priority} onChange={(e) => setPriority(e.target.value)} className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-500">
+          <div className="space-y-2">
+            <Label htmlFor="priority">Priority</Label>
+            <select id="priority" value={priority} onChange={(e) => setPriority(e.target.value)} className="flex h-11 w-full rounded-xl border border-input bg-background/80 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
               <option value="low">Low</option>
               <option value="medium">Medium</option>
               <option value="high">High</option>
             </select>
           </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">What happened?</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={5}
-              placeholder="Share the details that an admin should review."
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
-            />
-          </div>
-
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <p>For urgent emergencies or physical safety issues, contact local authorities first.</p>
-            </div>
-          </div>
-
-          {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
         </div>
 
-        <div className="flex items-center justify-end gap-3 border-t px-6 py-4">
-          <button onClick={() => onOpenChange(false)} className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50">
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={loading || !description.trim()}
-            className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
-          >
+        <div className="space-y-2">
+          <Label htmlFor="details">What happened?</Label>
+          <Textarea id="details" value={description} onChange={(e) => setDescription(e.target.value)} rows={6} placeholder="Describe what the admin team should review." />
+        </div>
+
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>For urgent emergencies or physical safety issues, contact local authorities first.</p>
+          </div>
+        </div>
+
+        {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">{error}</div> : null}
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={loading || !description.trim()} className="bg-red-600 hover:bg-red-700">
             {loading ? 'Submitting...' : 'Submit report'}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

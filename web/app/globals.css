@@ -2,64 +2,64 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 @layer base {
   :root {
     color-scheme: light;
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 220 33% 98%;
+    --foreground: 224 31% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 224 31% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
+    --popover-foreground: 224 31% 12%;
+    --primary: 221 83% 53%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
+    --secondary: 220 20% 95%;
+    --secondary-foreground: 224 31% 14%;
+    --muted: 220 18% 95%;
+    --muted-foreground: 220 12% 42%;
+    --accent: 221 100% 97%;
+    --accent-foreground: 224 31% 14%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --chart-1: 221.2 83.2% 53.3%;
+    --border: 220 18% 89%;
+    --input: 220 18% 89%;
+    --ring: 221 83% 53%;
+    --chart-1: 221 83% 53%;
     --chart-2: 160 84% 39%;
-    --chart-3: 262.1 83.3% 57.8%;
-    --chart-4: 43.3 96.4% 56.3%;
-    --chart-5: 346.8 77.2% 49.8%;
-    --radius: 0.5rem;
+    --chart-3: 262 83% 58%;
+    --chart-4: 43 96% 56%;
+    --chart-5: 347 77% 50%;
+    --radius: 1rem;
   }
 
   .dark {
     color-scheme: dark;
-    --background: 222.2 84% 4.9%;
+    --background: 224 30% 8%;
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
+    --card: 222 24% 10%;
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
+    --popover: 222 24% 10%;
     --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
+    --primary: 217 92% 60%;
+    --primary-foreground: 224 31% 10%;
+    --secondary: 223 18% 15%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
+    --muted: 223 18% 15%;
+    --muted-foreground: 215 16% 70%;
+    --accent: 223 18% 15%;
     --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 63% 40%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
-    --chart-1: 217.2 91.2% 59.8%;
+    --border: 223 16% 18%;
+    --input: 223 16% 18%;
+    --ring: 217 92% 60%;
+    --chart-1: 217 92% 60%;
     --chart-2: 160 84% 39%;
-    --chart-3: 263.4 70% 50.4%;
-    --chart-4: 47.9 95.8% 53.1%;
-    --chart-5: 346.8 77.2% 49.8%;
+    --chart-3: 263 70% 60%;
+    --chart-4: 48 96% 57%;
+    --chart-5: 347 77% 55%;
   }
 
   * {
@@ -69,36 +69,62 @@
   html,
   body {
     min-height: 100%;
+    scroll-behavior: smooth;
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased transition-colors duration-300;
+    @apply bg-background text-foreground font-sans antialiased;
+    background-image:
+      radial-gradient(circle at top, hsl(var(--primary) / 0.12), transparent 28%),
+      radial-gradient(circle at bottom right, hsl(var(--chart-3) / 0.08), transparent 24%);
   }
 
-  a,
-  button,
-  input,
-  textarea,
-  select,
-  nav,
-  section,
-  header,
-  footer,
-  main,
-  aside,
-  div,
-  svg,
-  path {
-    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, box-shadow;
-    transition-duration: 200ms;
-    transition-timing-function: ease;
+  ::selection {
+    background: hsl(var(--primary) / 0.2);
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply border border-white/40 bg-white/75 shadow-[0_20px_60px_-20px_rgba(15,23,42,0.28)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70;
+  }
+
+ .surface-card {
+  @apply rounded-sm border border-border/60 shadow-[0_20px_60px_-30px_rgba(15,23,42,0.35)] backdrop-blur;
+  background-color: hsl(var(--card) / 0.9);
+}
+  .page-shell {
+    @apply relative min-h-screen overflow-hidden;
+  }
+
+.page-shell::before {
+  content: '';
+  @apply pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b to-transparent;
+  --tw-gradient-from: hsl(var(--primary) / 0.08) var(--tw-gradient-from-position);
+  --tw-gradient-to: hsl(var(--primary) / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary via-blue-500 to-violet-500 bg-clip-text text-transparent;
+  }
+
+  .grid-overlay {
+    background-image: linear-gradient(to right, hsl(var(--border) / 0.35) 1px, transparent 1px), linear-gradient(to bottom, hsl(var(--border) / 0.35) 1px, transparent 1px);
+    background-size: 28px 28px;
   }
 }
 
 @layer utilities {
-  .animate-fade-in { animation: fade-in 0.6s ease-out forwards; }
-  .animation-delay-100 { animation-delay: 0.1s; opacity: 0; }
-  .animation-delay-200 { animation-delay: 0.2s; opacity: 0; }
-  .animation-delay-300 { animation-delay: 0.3s; opacity: 0; }
-  .animation-delay-400 { animation-delay: 0.4s; opacity: 0; }
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }

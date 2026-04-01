@@ -1,18 +1,27 @@
-'use client'
-import { useState, useEffect } from 'react'
+"use client"
+
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { BookOpen, MapPin, User, MessageCircle, Heart, ArrowLeft, ShieldCheck, Clock3, BadgeCheck, PenSquare, Flag } from 'lucide-react'
+import { ArrowLeft, BookOpen, Flag, MapPin, MessageCircle, ShieldCheck, Star, User } from 'lucide-react'
+
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import api from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
-import { cn, getConditionColor, getStatusColor, formatDate, formatRating } from '@/lib/utils'
-import Link from 'next/link'
+import { cn, formatDate, formatRating, getConditionColor, getStatusColor } from '@/lib/utils'
 import StarDisplay from '@/components/reviews/StarDisplay'
 import ReviewCard from '@/components/reviews/ReviewCard'
 import ReviewForm from '@/components/reviews/ReviewForm'
 import ReportDialog from '@/components/safety/ReportDialog'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Textarea } from '@/components/ui/textarea'
 
 const emptyReviewsState = {
   reviews: [],
@@ -54,7 +63,6 @@ export default function BookDetailPage() {
       setReviewsData(emptyReviewsState)
       return
     }
-
     setReviewsLoading(true)
     try {
       const { data } = await api.get(`/reviews/public/book/${id}`)
@@ -74,7 +82,6 @@ export default function BookDetailPage() {
         setLoading(false)
       }
     }
-
     load()
   }, [id, router])
 
@@ -91,6 +98,7 @@ export default function BookDetailPage() {
       await api.post('/requests', { bookId: id, message: requestMsg })
       setSuccess('Request sent successfully.')
       setShowRequestForm(false)
+      setRequestMsg('')
       await fetchBook()
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to send request')
@@ -133,24 +141,25 @@ export default function BookDetailPage() {
     }
   }
 
-  if (loading) return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <Navbar />
-      <div className="max-w-5xl mx-auto px-4 py-16">
-        <div className="animate-pulse">
-          <div className="h-8 w-40 bg-gray-200 dark:bg-gray-800 rounded mb-8" />
-          <div className="grid md:grid-cols-2 gap-10">
-            <div className="aspect-[3/4] bg-gray-200 dark:bg-gray-800 rounded-2xl" />
+  if (loading) {
+    return (
+      <div className="page-shell">
+        <Navbar />
+        <main className="mx-auto max-w-[1920px] px-3 pb-10 pt-6 sm:px-6">
+          <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
+            <Skeleton className="aspect-[4/5] w-full rounded-[2rem]" />
             <div className="space-y-4">
-              <div className="h-8 bg-gray-200 dark:bg-gray-800 rounded w-3/4" />
-              <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-1/2" />
-              <div className="h-32 bg-gray-200 dark:bg-gray-800 rounded" />
+              <Skeleton className="h-6 w-28" />
+              <Skeleton className="h-12 w-3/4" />
+              <Skeleton className="h-6 w-1/2" />
+              <Skeleton className="h-28 w-full" />
+              <Skeleton className="h-52 w-full rounded-[2rem]" />
             </div>
           </div>
-        </div>
+        </main>
       </div>
-    </div>
-  )
+    )
+  }
 
   if (!book) return null
 
@@ -161,307 +170,235 @@ export default function BookDetailPage() {
   const reviewsCount = reviewsData.summary?.reviewsCount || book.ratingsCount || 0
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="page-shell">
       <Navbar />
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <Link href="/books" className="inline-flex items-center gap-2 text-gray-500 hover:text-blue-600 mb-8 transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Back to Books
-        </Link>
+      <main className="mx-auto max-w-[1920px] px-3 pb-10 pt-6 sm:px-6">
+        <Button variant="ghost" asChild className="mb-4 rounded-full px-0">
+          <Link href="/books"><ArrowLeft className="mr-2 h-4 w-4" /> Back to catalog</Link>
+        </Button>
 
-        <div className="grid md:grid-cols-2 gap-10">
-          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-            <div className="relative aspect-[3/4] bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-800 dark:to-gray-700 rounded-2xl overflow-hidden shadow-lg">
-              {book.image ? (
-                <img src={book.image} alt={book.title} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <BookOpen className="w-24 h-24 text-blue-300" />
-                </div>
-              )}
-              <div className="absolute top-4 left-4 flex gap-2">
-                <span className={cn('text-sm font-medium px-3 py-1 rounded-full', getConditionColor(book.condition))}>
-                  {book.condition}
-                </span>
-                <span className={cn('text-sm font-medium px-3 py-1 rounded-full', getStatusColor(book.status))}>
-                  {book.status}
-                </span>
-              </div>
-              <div className="absolute bottom-4 left-4 right-4 bg-white/90 dark:bg-gray-900/80 backdrop-blur-sm rounded-xl px-4 py-3 flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-wider text-gray-400 mb-1">Public rating</p>
-                  <div className="flex items-center gap-2">
-                    <StarDisplay value={averageRating} showValue />
-                    <span className="text-sm text-gray-500">{reviewsCount} review{reviewsCount === 1 ? '' : 's'}</span>
-                  </div>
-                </div>
-                {donorReputation?.overallScore ? (
-                  <div className="text-right">
-                    <p className="text-xs uppercase tracking-wider text-gray-400 mb-1">Donor reputation</p>
-                    <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-sm font-semibold">
-                      <ShieldCheck className="w-4 h-4" /> {formatRating(donorReputation.overallScore)} / 5
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
-            <div>
-              <p className="text-blue-600 font-semibold mb-2">{book.category}</p>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{book.title}</h1>
-              <p className="text-xl text-gray-600 dark:text-gray-400">by {book.author}</p>
-              <div className="flex flex-wrap items-center gap-3 mt-4">
-                <div className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                  <StarDisplay value={averageRating} size="sm" />
-                  <span>{reviewsCount ? `${formatRating(averageRating)} from ${reviewsCount} public review${reviewsCount === 1 ? '' : 's'}` : 'No public reviews yet'}</span>
-                </div>
-                {donorReputation?.overallScore ? (
-                  <div className="inline-flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full">
-                    <ShieldCheck className="w-4 h-4" />
-                    Trusted donor: {formatRating(donorReputation.overallScore)}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            {book.description && (
-              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">{book.description}</p>
-            )}
-
-            <div className="grid grid-cols-2 gap-4 py-4 border-y border-gray-100 dark:border-gray-800">
-              {[
-                { label: 'Language', value: book.language || 'English' },
-                { label: 'Pages', value: book.pages || 'N/A' },
-                { label: 'ISBN', value: book.isbn || 'N/A' },
-                { label: 'Published', value: book.publishedYear || 'N/A' },
-                { label: 'Listed', value: formatDate(book.createdAt) },
-                { label: 'Metadata', value: book.metadataSource ? String(book.metadataSource).replace(/_/g, ' ') : 'Manual entry' },
-              ].map(({ label, value }) => (
-                <div key={label}>
-                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">{label}</p>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{value}</p>
-                </div>
-              ))}
-            </div>
-
-            {book.donorId && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 bg-gray-50 dark:bg-gray-900 rounded-xl p-4">
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
-                    {book.donorId.profileImage ? (
-                      <img src={book.donorId.profileImage} alt={book.donorId.name} className="w-12 h-12 rounded-full object-cover" />
-                    ) : (
-                      <User className="w-6 h-6 text-blue-600" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400">Donated by</p>
-                    <p className="font-semibold text-gray-900 dark:text-white">{book.donorId.name}</p>
-                    {book.donorId.location && (
-                      <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                        <MapPin className="w-3 h-3" />{book.donorId.location}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {donorReputation?.overallScore ? (
-                  <div className="grid sm:grid-cols-3 gap-3">
-                    <div className="rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 px-4 py-4">
-                      <div className="flex items-center gap-2 text-emerald-700 mb-2">
-                        <ShieldCheck className="w-4 h-4" />
-                        <p className="text-sm font-semibold">Overall</p>
-                      </div>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatRating(donorReputation.overallScore)}</p>
-                      <p className="text-xs text-gray-400 mt-1">Based on private receiver feedback and response time</p>
-                    </div>
-                    <div className="rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 px-4 py-4">
-                      <div className="flex items-center gap-2 text-blue-700 mb-2">
-                        <Clock3 className="w-4 h-4" />
-                        <p className="text-sm font-semibold">Response speed</p>
-                      </div>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatRating(donorReputation.responseSpeedScore)}</p>
-                      <p className="text-xs text-gray-400 mt-1">Average reply: {donorReputation.avgResponseHours || 0}h</p>
-                    </div>
-                    <div className="rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 px-4 py-4">
-                      <div className="flex items-center gap-2 text-indigo-700 mb-2">
-                        <BadgeCheck className="w-4 h-4" />
-                        <p className="text-sm font-semibold">Accuracy</p>
-                      </div>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatRating(donorReputation.accuracyScore)}</p>
-                      <p className="text-xs text-gray-400 mt-1">{donorReputation.totalReviewedDonations || 0} private review{donorReputation.totalReviewedDonations === 1 ? '' : 's'}</p>
-                    </div>
-                  </div>
+        <section className="grid gap-6 lg:grid-cols-[420px_1fr] xl:grid-cols-[420px_1fr_320px]">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <Card className="overflow-hidden rounded-[2rem]">
+              <div className="relative aspect-[4/5] overflow-hidden bg-gradient-to-br from-primary/10 via-blue-500/10 to-violet-500/10">
+                {book.image ? (
+                  <img src={book.image} alt={book.title} className="h-full w-full object-cover" />
                 ) : (
-                  <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700">
-                    This donor is still building their reputation. Once receivers confirm deliveries and leave private feedback, their score will appear here.
+                  <div className="grid h-full place-items-center text-primary/40">
+                    <BookOpen className="h-20 w-20" />
                   </div>
                 )}
-              </div>
-            )}
-
-            {success && (
-              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm">
-                {success}
-              </div>
-            )}
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-                {error}
-              </div>
-            )}
-
-            {showRequestForm && (
-              <div className="space-y-3">
-                <textarea
-                  placeholder="Tell the donor why you'd like this book (optional)..."
-                  value={requestMsg}
-                  onChange={(e: any) => setRequestMsg(e.target.value)}
-                  rows={3}
-                  className="w-full border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <div className="flex gap-2">
-                  <button onClick={handleRequest} disabled={requesting}
-                    className="flex-1 bg-blue-600 text-white font-semibold py-2.5 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50">
-                    {requesting ? 'Sending...' : 'Send Request'}
-                  </button>
-                  <button onClick={() => setShowRequestForm(false)}
-                    className="px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                    Cancel
-                  </button>
+                <div className="absolute inset-x-4 top-4 flex flex-wrap gap-2">
+                  <span className={cn('rounded-full px-3 py-1 text-xs font-medium', getConditionColor(book.condition))}>{book.condition}</span>
+                  <span className={cn('rounded-full px-3 py-1 text-xs font-medium', getStatusColor(book.status))}>{book.status}</span>
                 </div>
-              </div>
-            )}
-
-            {!showRequestForm && !success && (
-              <div className="space-y-3">
-                <div className="flex gap-3">
-                  {canRequest && (
-                    <button onClick={() => setShowRequestForm(true)}
-                      className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 transition-colors">
-                      <Heart className="w-5 h-5" /> Request This Book
-                    </button>
-                  )}
-                  {user && !isOwner && (
-                    <Link href={`/dashboard/chat?userId=${book.donorId?._id}&bookId=${book._id}`}
-                      className="flex-1 inline-flex items-center justify-center gap-2 border-2 border-blue-600 text-blue-600 font-semibold py-3 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
-                      <MessageCircle className="w-5 h-5" /> Message Donor
-                    </Link>
-                  )}
-                  {!user && (
-                    <Link href="/auth/login"
-                      className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 transition-colors">
-                      Sign in to Request
-                    </Link>
-                  )}
-                  {book.status !== 'available' && !isOwner && (
-                    <div className="flex-1 text-center py-3 bg-gray-100 dark:bg-gray-800 rounded-xl text-gray-500 font-medium">
-                      Book not available
+                <div className="absolute inset-x-4 bottom-4 rounded-[1.5rem] border border-white/30 bg-white/85 p-4 backdrop-blur dark:border-white/10 dark:bg-slate-950/75">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Public rating</p>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <div>
+                      <StarDisplay value={averageRating} showValue />
+                      <p className="mt-2 text-sm text-muted-foreground">{reviewsCount} review{reviewsCount === 1 ? '' : 's'}</p>
                     </div>
-                  )}
-                </div>
-                {user && !isOwner && (
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      onClick={() => {
-                        setReportContext({ targetType: 'book', targetId: book._id, targetLabel: `listing: ${book.title}`, initialCategory: 'fake_listing' })
-                        setShowReportDialog(true)
-                      }}
-                      className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50"
-                    >
-                      <Flag className="h-4 w-4" /> Report listing
-                    </button>
-                    <button
-                      onClick={() => {
-                        setReportContext({ targetType: 'user', targetId: book.donorId?._id, targetLabel: `donor: ${book.donorId?.name || 'Unknown user'}`, initialCategory: 'suspicious_user' })
-                        setShowReportDialog(true)
-                      }}
-                      className="inline-flex items-center gap-2 rounded-xl border border-amber-200 px-4 py-2 text-sm font-medium text-amber-700 transition hover:bg-amber-50"
-                    >
-                      <Flag className="h-4 w-4" /> Report donor
-                    </button>
+                    {donorReputation?.overallScore ? (
+                      <Badge variant="secondary" className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                        <ShieldCheck className="mr-1 h-3.5 w-3.5" /> {formatRating(donorReputation.overallScore)} donor trust
+                      </Badge>
+                    ) : null}
                   </div>
-                )}
+                </div>
               </div>
-            )}
+            </Card>
           </motion.div>
-        </div>
 
-        <div className="mt-12 space-y-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Public Reviews</h2>
-              <p className="text-gray-500 mt-1">Signed-in users can publish one public review per book.</p>
-            </div>
-            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 min-w-[220px]">
-              <p className="text-xs uppercase tracking-wider text-gray-400 mb-1">Average public rating</p>
-              <div className="flex items-center gap-3">
-                <StarDisplay value={averageRating} showValue />
-                <span className="text-sm text-gray-500">{reviewsCount} total</span>
-              </div>
-            </div>
-          </div>
-
-          {!user ? (
-            <div className="bg-white dark:bg-gray-900 border border-dashed border-gray-200 dark:border-gray-800 rounded-2xl px-6 py-12 text-center text-gray-500">
-              Sign in to view public reviews and add your own rating and comment.
-            </div>
-          ) : (
-            <>
-              <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                  <p className="font-semibold text-gray-900">{reviewsData.myReview ? 'You already reviewed this book' : 'Share your reading experience'}</p>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {reviewsData.myReview
-                      ? 'You can edit or delete your public review anytime.'
-                      : 'A public review requires both a star rating and a written comment.'}
-                  </p>
+          <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 xl:col-span-1">
+            <Card className="rounded-[2rem]">
+              <CardContent className="p-6 sm:p-8">
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">{book.category}</p>
+                <h1 className="mt-3 text-3xl font-semibold text-balance sm:text-4xl">{book.title}</h1>
+                <p className="mt-3 text-lg text-muted-foreground">by {book.author}</p>
+                <div className="mt-5 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1.5">
+                    <MapPin className="h-4 w-4 text-primary" /> {book.location || 'Location shared after request'}
+                  </div>
+                  <div className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1.5">
+                    <Star className="h-4 w-4 text-primary" /> {reviewsCount ? `${formatRating(averageRating)} average` : 'No ratings yet'}
+                  </div>
                 </div>
-                <button
-                  onClick={() => setShowPublicReviewForm((prev) => !prev)}
-                  className="inline-flex items-center justify-center gap-2 bg-blue-600 text-white font-semibold px-4 py-2.5 rounded-xl hover:bg-blue-700 transition-colors"
-                >
-                  <PenSquare className="w-4 h-4" />
-                  {showPublicReviewForm
-                    ? 'Hide review form'
-                    : reviewsData.myReview
-                      ? 'Edit your review'
-                      : 'Write a review'}
-                </button>
-              </div>
 
-              {showPublicReviewForm && (
-                <ReviewForm
-                  mode="public"
-                  initialValues={reviewsData.myReview || undefined}
-                  onSubmit={handlePublicReviewSubmit}
-                  onDelete={reviewsData.myReview ? handleDeletePublicReview : undefined}
-                  onCancel={() => setShowPublicReviewForm(false)}
-                  submitLabel={reviewsData.myReview ? 'Update public review' : 'Publish public review'}
-                  deleteLabel="Delete public review"
-                />
-              )}
+                {book.description ? <p className="mt-6 text-sm leading-8 text-muted-foreground">{book.description}</p> : null}
 
-              {reviewsLoading ? (
-                <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl px-6 py-12 text-center text-gray-400">
-                  Loading public reviews...
-                </div>
-              ) : reviewsData.reviews?.length ? (
-                <div className="grid gap-4">
-                  {reviewsData.reviews.map((review: any) => (
-                    <ReviewCard key={review._id} review={review} />
+                <div className="mt-8 grid gap-3 sm:grid-cols-2">
+                  {[
+                    { label: 'Language', value: book.language || 'English' },
+                    { label: 'Pages', value: book.pages || 'N/A' },
+                    { label: 'ISBN', value: book.isbn || 'N/A' },
+                    { label: 'Published', value: book.publishedYear || 'N/A' },
+                    { label: 'Listed', value: formatDate(book.createdAt) },
+                    { label: 'Condition', value: book.condition },
+                  ].map((item) => (
+                    <div key={item.label} className="rounded-[1.5rem] bg-muted/70 px-4 py-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{item.label}</p>
+                      <p className="mt-2 text-sm font-medium">{item.value}</p>
+                    </div>
                   ))}
                 </div>
-              ) : (
-                <div className="bg-white dark:bg-gray-900 border border-dashed border-gray-200 dark:border-gray-800 rounded-2xl px-6 py-12 text-center text-gray-400">
-                  No public reviews yet for this title. Be the first signed-in reader to rate it.
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-[2rem]">
+              <CardHeader>
+                <CardTitle>About the donor</CardTitle>
+                <CardDescription>Trust signals and direct communication for safer exchanges.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-4 rounded-[1.5rem] bg-muted/60 p-4">
+                  <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-primary">
+                    {book.donorId?.profileImage ? <img src={book.donorId.profileImage} alt={book.donorId.name} className="h-full w-full object-cover" /> : <User className="h-5 w-5" />}
+                  </div>
+                  <div>
+                    <p className="font-semibold">{book.donorId?.name || 'Book donor'}</p>
+                    <p className="text-sm text-muted-foreground">{book.location || 'Community member'}</p>
+                  </div>
                 </div>
+                {donorReputation?.overallScore ? (
+                  <div className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+                    Donor reputation score: <span className="font-semibold">{formatRating(donorReputation.overallScore)} / 5</span>
+                  </div>
+                ) : (
+                  <div className="rounded-[1.5rem] border border-border/70 bg-background/60 p-4 text-sm text-muted-foreground">
+                    This donor is still building reputation feedback.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} className="space-y-4 xl:sticky xl:top-28 h-fit">
+            <Card className="rounded-[2rem]">
+              <CardHeader>
+                <CardTitle>Next steps</CardTitle>
+                <CardDescription>Request the book, contact the donor, or leave a review if you have already interacted.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {canRequest ? (
+                  <Button onClick={() => setShowRequestForm(true)} className="w-full rounded-xl">Request this book</Button>
+                ) : !user ? (
+                  <Button asChild className="w-full rounded-xl">
+                    <Link href="/auth/login">Sign in to request</Link>
+                  </Button>
+                ) : isOwner ? (
+                  <Button variant="outline" className="w-full rounded-xl" disabled>You own this listing</Button>
+                ) : (
+                  <Button variant="outline" className="w-full rounded-xl" disabled>Currently unavailable</Button>
+                )}
+
+                {!isOwner && user && book.donorId?._id ? (
+                  <Button asChild variant="outline" className="w-full rounded-xl">
+                    <Link href={`/dashboard/chat?userId=${book.donorId._id}&bookId=${book._id}`}>
+                      <MessageCircle className="mr-2 h-4 w-4" /> Message donor
+                    </Link>
+                  </Button>
+                ) : null}
+
+                {token ? (
+                  <Button variant="ghost" onClick={() => setShowPublicReviewForm(true)} className="w-full rounded-xl">
+                    {reviewsData.myReview ? 'Edit your review' : 'Leave a public review'}
+                  </Button>
+                ) : null}
+
+                <Button
+                  variant="ghost"
+                  className="w-full rounded-xl text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-500/10 dark:hover:text-red-300"
+                  onClick={() => {
+                    setReportContext({
+                      targetType: 'book',
+                      targetId: book._id,
+                      targetLabel: `book: ${book.title}`,
+                      initialCategory: 'fake_listing',
+                    })
+                    setShowReportDialog(true)
+                  }}
+                >
+                  <Flag className="mr-2 h-4 w-4" /> Report listing
+                </Button>
+              </CardContent>
+            </Card>
+
+            {success ? <div className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">{success}</div> : null}
+            {error ? <div className="rounded-[1.5rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">{error}</div> : null}
+          </motion.div>
+        </section>
+
+        <section className="mt-8 grid gap-6 lg:grid-cols-[1fr_320px]">
+          <Card className="rounded-[2rem]">
+            <CardHeader>
+              <CardTitle>Public reviews</CardTitle>
+              <CardDescription>Community feedback that helps future readers decide with confidence.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {reviewsLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="h-40 w-full rounded-[1.5rem]" />)}
+                </div>
+              ) : reviewsData.reviews?.length ? (
+                <div className="space-y-4">
+                  {reviewsData.reviews.map((review: any) => <ReviewCard key={review._id} review={review} />)}
+                </div>
+              ) : (
+                <EmptyState icon={Star} title="No reviews yet" description="Be the first reader to leave a public review once you have interacted with this listing." className="border-0 shadow-none" />
               )}
-            </>
-          )}
-        </div>
-      </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-[2rem]">
+            <CardHeader>
+              <CardTitle>Review summary</CardTitle>
+              <CardDescription>A quick snapshot of current public sentiment.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-[1.5rem] bg-muted/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Average rating</p>
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <StarDisplay value={averageRating} showValue />
+                  <p className="text-sm text-muted-foreground">{reviewsCount} total</p>
+                </div>
+              </div>
+              <div className="rounded-[1.5rem] bg-muted/70 p-4 text-sm leading-7 text-muted-foreground">
+                Review quality improves donor trust and helps future readers understand the true condition of the book.
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      </main>
+
+      <Dialog open={showRequestForm} onOpenChange={setShowRequestForm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request {book.title}</DialogTitle>
+            <DialogDescription>Introduce yourself and mention how you plan to use the book.</DialogDescription>
+          </DialogHeader>
+          <Textarea value={requestMsg} onChange={(e) => setRequestMsg(e.target.value)} rows={5} placeholder="Hi! I would love to request this book because..." />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowRequestForm(false)}>Cancel</Button>
+            <Button onClick={handleRequest} disabled={requesting || !requestMsg.trim()}>{requesting ? 'Sending...' : 'Send request'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showPublicReviewForm} onOpenChange={setShowPublicReviewForm}>
+        <DialogContent className="max-w-3xl border-0 bg-transparent p-0 shadow-none">
+          <ReviewForm
+            mode="public"
+            initialValues={reviewsData.myReview || undefined}
+            onSubmit={handlePublicReviewSubmit}
+            onDelete={reviewsData.myReview ? handleDeletePublicReview : undefined}
+            onCancel={() => setShowPublicReviewForm(false)}
+            submitLabel={reviewsData.myReview ? 'Update public review' : 'Publish public review'}
+            deleteLabel="Delete public review"
+          />
+        </DialogContent>
+      </Dialog>
+
       {reportContext ? (
         <ReportDialog
           open={showReportDialog}
@@ -473,6 +410,7 @@ export default function BookDetailPage() {
           onSubmitted={(message) => setSuccess(message)}
         />
       ) : null}
+
       <Footer />
     </div>
   )

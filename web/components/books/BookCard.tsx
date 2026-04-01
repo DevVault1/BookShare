@@ -1,11 +1,17 @@
-'use client'
+"use client"
+
 import Link from 'next/link'
-import { MapPin, BookOpen, ShieldCheck } from 'lucide-react'
-import { cn, getConditionColor, getStatusColor, formatRating } from '@/lib/utils'
+import { useState } from 'react'
+import { Heart, MapPin, ShieldCheck, Star } from 'lucide-react'
+import { motion } from 'framer-motion'
+
+import { cn, formatRating, getConditionColor, getStatusColor } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import StarDisplay from '@/components/reviews/StarDisplay'
 
 interface BookCardProps {
-  key?: string
   book: {
     _id: string
     title: string
@@ -28,60 +34,87 @@ interface BookCardProps {
 }
 
 export default function BookCard({ book }: BookCardProps) {
+  const [liked, setLiked] = useState(false)
+
   return (
-    <Link href={`/books/${book._id}`}>
-      <div className="group bg-white dark:bg-gray-900 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-800 hover:shadow-lg hover:-translate-y-1 transition-all duration-200 h-full">
-        <div className="relative aspect-[3/4] bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-800 dark:to-gray-700">
-          {book.image ? (
-            <img src={book.image} alt={book.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <BookOpen className="w-12 h-12 text-blue-300" />
-            </div>
-          )}
-          <div className="absolute top-2 right-2">
-            <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', getConditionColor(book.condition))}>
-              {book.condition}
-            </span>
-          </div>
-          <div className="absolute top-2 left-2">
-            <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', getStatusColor(book.status))}>
-              {book.status}
-            </span>
-          </div>
-        </div>
-
-        <div className="p-3">
-          <p className="text-xs text-blue-600 font-medium mb-1">{book.category}</p>
-          <h3 className="font-semibold text-gray-900 dark:text-white text-sm leading-tight line-clamp-2 mb-1">{book.title}</h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">{book.author}</p>
-
-          <div className="flex items-center justify-between gap-3 mb-2">
-            {book.ratingsCount ? (
-              <div className="flex items-center gap-2 text-xs text-gray-500">
-                <StarDisplay value={book.ratingsAverage} size="sm" />
-                <span>{formatRating(book.ratingsAverage)} ({book.ratingsCount})</span>
-              </div>
+    <motion.div whileHover={{ y: -6 }} transition={{ duration: 0.2 }}>
+      <Card className="group overflow-hidden rounded-[1.75rem] border-border/60">
+        <Link href={`/books/${book._id}`} className="block">
+          <div className="relative aspect-[4/5] overflow-hidden bg-gradient-to-br from-primary/10 via-blue-500/10 to-violet-500/10">
+            {book.image ? (
+              <img src={book.image} alt={book.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
             ) : (
-              <span className="text-xs text-gray-400">No reviews yet</span>
+              <div className="grid h-full place-items-center text-primary/50">
+                <Star className="h-10 w-10" />
+              </div>
             )}
 
-            {book.donorId?.donorReputation?.overallScore ? (
-              <div className="inline-flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>{formatRating(book.donorId.donorReputation.overallScore)}</span>
+            <div className="absolute inset-x-0 top-0 flex items-start justify-between p-3">
+              <div className="flex flex-wrap gap-2">
+                <span className={cn('rounded-full px-3 py-1 text-xs font-medium backdrop-blur', getConditionColor(book.condition))}>{book.condition}</span>
+                <span className={cn('rounded-full px-3 py-1 text-xs font-medium backdrop-blur', getStatusColor(book.status))}>{book.status}</span>
               </div>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault()
+                  setLiked((value) => !value)
+                }}
+                className="rounded-full border border-white/30 bg-white/80 p-2 text-slate-700 shadow-sm backdrop-blur transition hover:scale-105 dark:border-white/10 dark:bg-slate-950/70 dark:text-white"
+                aria-label="Add to wishlist"
+              >
+                <Heart className={cn('h-4 w-4 transition', liked && 'fill-current text-rose-500')} />
+              </button>
+            </div>
+
+            <div className="absolute inset-x-3 bottom-3 flex items-center justify-between rounded-2xl border border-white/30 bg-white/85 px-3 py-2 backdrop-blur dark:border-white/10 dark:bg-slate-950/75">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Category</p>
+                <p className="text-sm font-medium">{book.category}</p>
+              </div>
+              <Button variant="glass" size="sm" className="rounded-full px-4">View</Button>
+            </div>
+          </div>
+        </Link>
+
+        <div className="space-y-4 p-5">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">{book.category}</p>
+            <Link href={`/books/${book._id}`} className="mt-2 block text-lg font-semibold leading-7 text-foreground transition hover:text-primary line-clamp-2">
+              {book.title}
+            </Link>
+            <p className="mt-1 text-sm text-muted-foreground">by {book.author}</p>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 min-w-0">
+              <MapPin className="h-4 w-4 text-primary" />
+              <span className="truncate">{book.location || 'Location shared after request'}</span>
+            </div>
+            {book.donorId?.donorReputation?.overallScore ? (
+              <Badge variant="secondary" className="rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                <ShieldCheck className="mr-1 h-3 w-3" /> {formatRating(book.donorId.donorReputation.overallScore)}
+              </Badge>
             ) : null}
           </div>
 
-          {book.location && (
-            <div className="flex items-center gap-1 text-xs text-gray-400">
-              <MapPin className="w-3 h-3" />
-              <span className="truncate">{book.location}</span>
+          <div className="flex items-center justify-between gap-3 border-t border-border/70 pt-4">
+            <div>
+              {book.ratingsCount ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <StarDisplay value={book.ratingsAverage} size="sm" />
+                  <span>{formatRating(book.ratingsAverage)} · {book.ratingsCount} review{book.ratingsCount === 1 ? '' : 's'}</span>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No public reviews yet</p>
+              )}
             </div>
-          )}
+            <Button variant="ghost" size="sm" asChild className="rounded-full">
+              <Link href={`/books/${book._id}`}>Details</Link>
+            </Button>
+          </div>
         </div>
-      </div>
-    </Link>
+      </Card>
+    </motion.div>
   )
 }

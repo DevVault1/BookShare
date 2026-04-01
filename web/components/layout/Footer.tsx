@@ -1,56 +1,64 @@
 import Link from 'next/link'
-import { BookOpen, Github, Twitter, Mail } from 'lucide-react'
+import { ArrowUpRight, BookHeart, Github, Mail, Twitter } from 'lucide-react'
+
+const footerLinks = {
+  product: [
+    { label: 'Browse books', href: '/books' },
+    { label: 'Donate a book', href: '/books/donate' },
+    { label: 'Dashboard', href: '/dashboard' },
+  ],
+  categories: [
+    { label: 'Technology', href: '/books?category=Technology' },
+    { label: 'Science', href: '/books?category=Science' },
+    { label: 'Literature', href: '/books?category=Literature' },
+  ],
+  account: [
+    { label: 'Login', href: '/auth/login' },
+    { label: 'Register', href: '/auth/register' },
+    { label: 'Messages', href: '/dashboard/chat' },
+  ],
+}
 
 export default function Footer() {
   return (
-    <footer className="bg-gray-900 text-gray-400 py-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
-          <div className="col-span-2 md:col-span-1">
-            <Link href="/" className="flex items-center gap-2 text-white font-bold text-xl mb-4">
-              <BookOpen className="w-7 h-7 text-blue-500" />
-              Adopt A Book
-            </Link>
-            <p className="text-sm leading-relaxed mb-4">
-              Connecting book donors with eager readers. Giving books a second life and knowledge a second chance.
-            </p>
-            <div className="flex gap-3">
-              <a href="#" className="hover:text-white transition-colors"><Github className="w-5 h-5" /></a>
-              <a href="#" className="hover:text-white transition-colors"><Twitter className="w-5 h-5" /></a>
-              <a href="#" className="hover:text-white transition-colors"><Mail className="w-5 h-5" /></a>
+    <footer className="px-3 pb-6 pt-14 sm:px-6">
+      <div className="mx-auto grid max-w-[1920px] gap-8 rounded-[2rem]  bg-card/80 px-6 py-8  backdrop-blur sm:px-8 lg:grid-cols-[1.3fr_repeat(3,0.9fr)]">
+        <div>
+          <Link href="/" className="inline-flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/25">
+              <BookHeart className="h-5 w-5" />
             </div>
-          </div>
-
-          <div>
-            <h4 className="text-white font-semibold mb-4">Platform</h4>
-            <ul className="space-y-2 text-sm">
-              <li><Link href="/books" className="hover:text-white transition-colors">Browse Books</Link></li>
-              <li><Link href="/books/donate" className="hover:text-white transition-colors">Donate a Book</Link></li>
-              <li><Link href="/dashboard" className="hover:text-white transition-colors">Dashboard</Link></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="text-white font-semibold mb-4">Categories</h4>
-            <ul className="space-y-2 text-sm">
-              {['Fiction', 'Science', 'Mathematics', 'Technology', 'History'].map(c => (
-                <li key={c}><Link href={`/books?category=${c}`} className="hover:text-white transition-colors">{c}</Link></li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="text-white font-semibold mb-4">Account</h4>
-            <ul className="space-y-2 text-sm">
-              <li><Link href="/auth/login" className="hover:text-white transition-colors">Sign In</Link></li>
-              <li><Link href="/auth/register" className="hover:text-white transition-colors">Register</Link></li>
-              <li><Link href="/dashboard" className="hover:text-white transition-colors">My Books</Link></li>
-            </ul>
+            <div>
+              <p className="text-sm font-semibold text-muted-foreground">Adopt A Book</p>
+              <p className="text-lg font-semibold">Modern exchange platform</p>
+            </div>
+          </Link>
+          <p className="mt-4 max-w-md text-sm leading-6 text-muted-foreground">
+            A premium community experience for giving books a second life, making discovery easier for students, donors, and admins.
+          </p>
+          <div className="mt-6 flex items-center gap-3 text-muted-foreground">
+            <a href="#" className="rounded-full border border-border/70 p-2 transition hover:bg-accent hover:text-foreground"><Github className="h-4 w-4" /></a>
+            <a href="#" className="rounded-full border border-border/70 p-2 transition hover:bg-accent hover:text-foreground"><Twitter className="h-4 w-4" /></a>
+            <a href="#" className="rounded-full border border-border/70 p-2 transition hover:bg-accent hover:text-foreground"><Mail className="h-4 w-4" /></a>
           </div>
         </div>
 
-        <div className="border-t border-gray-800 pt-8 text-sm text-center">
-          © {new Date().getFullYear()} Adopt A Book. Built with ❤️ for education.
+        {Object.entries(footerLinks).map(([section, items]) => (
+          <div key={section}>
+            <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">{section}</h4>
+            <div className="mt-4 space-y-3">
+              {items.map((item) => (
+                <Link key={item.href} href={item.href} className="group flex items-center justify-between text-sm text-foreground/80 transition hover:text-foreground">
+                  <span>{item.label}</span>
+                 
+                </Link>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        <div className="lg:col-span-4 mt-2 flex flex-col gap-3 border-t border-border/70 pt-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <p>© {new Date().getFullYear()} Adopt A Book. Crafted as a premium book-sharing product.</p>
         </div>
       </div>
     </footer>
