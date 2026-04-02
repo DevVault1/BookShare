@@ -104,13 +104,38 @@ export default function DashboardPage() {
     }
   }
 
+  const syncRequestInState = (requestId: string, nextStatus: string) => {
+    setDonorRequests((prev) => prev.map((req: any) => (
+      req._id === requestId ? { ...req, status: nextStatus, responseDate: new Date().toISOString() } : req
+    )))
+
+    setMyRequests((prev) => prev.map((req: any) => (
+      req._id === requestId ? { ...req, status: nextStatus, responseDate: new Date().toISOString() } : req
+    )))
+
+    setMyBooks((prev) => prev.map((book: any) => {
+      const relatedRequest = donorRequests.find((req: any) => req._id === requestId) || myRequests.find((req: any) => req._id === requestId)
+      if (!relatedRequest?.bookId) return book
+      const relatedBookId = typeof relatedRequest.bookId === 'string' ? relatedRequest.bookId : relatedRequest.bookId._id
+      if (book._id !== relatedBookId) return book
+      return {
+        ...book,
+        status: nextStatus === 'approved' || nextStatus === 'accepted' ? 'adopted' : 'available',
+      }
+    }))
+  }
+
   const handleRequestResponse = async (id: string, status: string) => {
     setActionError('')
     setActionMessage('')
     try {
-      await api.put(`/requests/${id}/respond`, { status })
-      setActionMessage(`Request ${status} successfully.`)
-      fetchAll()
+      const normalizedStatus = status === 'accepted' ? 'approved' : status
+      const { data } = await api.put(`/requests/${id}/respond`, { status: normalizedStatus })
+      const resolvedStatus = data?.status || normalizedStatus
+
+      syncRequestInState(id, resolvedStatus)
+      setActionMessage(`Request ${resolvedStatus} successfully.`)
+      await fetchAll()
     } catch (err: any) {
       setActionError(err.response?.data?.message || 'Failed to update request')
     }
@@ -390,11 +415,16 @@ export default function DashboardPage() {
                               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
                                   <p className="font-medium">{req.bookId?.title}</p>
-                                  <p className="text-sm text-muted-foreground">Requested by {req.studentId?.name} · {formatDate(req.requestDate)}</p>
+                                  <p className="text-sm text-muted-foreground">Requested by {req.requesterId?.name} · {formatDate(req.requestDate)}</p>
                                 </div>
-                                <div className="flex gap-2">
-                                  <Button size="sm" className="rounded-full" onClick={() => handleRequestResponse(req._id, 'approved')}>Approve</Button>
-                                  <Button size="sm" variant="outline" className="rounded-full" onClick={() => handleRequestResponse(req._id, 'rejected')}>Reject</Button>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className={cn('rounded-full px-3 py-1 text-xs font-medium', getStatusColor(req.status))}>{req.status}</span>
+                                  {(req.status === 'pending') ? (
+                                    <>
+                                      <Button size="sm" className="rounded-full" onClick={() => handleRequestResponse(req._id, 'approved')}>Approve</Button>
+                                      <Button size="sm" variant="outline" className="rounded-full" onClick={() => handleRequestResponse(req._id, 'rejected')}>Reject</Button>
+                                    </>
+                                  ) : null}
                                 </div>
                               </div>
                             </div>
@@ -493,12 +523,12 @@ export default function DashboardPage() {
                               <div className="flex items-center justify-between gap-3">
                                 <div>
                                   <p className="font-medium">{req.bookId?.title}</p>
-                                  <p className="text-sm text-muted-foreground">{req.studentId?.name} · {formatDate(req.requestDate)}</p>
+                                  <p className="text-sm text-muted-foreground">{req.requesterId?.name} · {formatDate(req.requestDate)}</p>
                                 </div>
                                 <span className={cn('rounded-full px-3 py-1 text-xs font-medium', getStatusColor(req.status))}>{req.status}</span>
                               </div>
                               {req.message ? <p className="text-sm text-muted-foreground">“{req.message}”</p> : null}
-                              {req.status === 'pending' ? (
+                              {(req.status === 'pending') ? (
                                 <div className="flex gap-2">
                                   <Button size="sm" className="rounded-full" onClick={() => handleRequestResponse(req._id, 'approved')}>Approve</Button>
                                   <Button size="sm" variant="outline" className="rounded-full" onClick={() => handleRequestResponse(req._id, 'rejected')}>Reject</Button>
