@@ -10,6 +10,7 @@ const User = require('./models/User');
 const Conversation = require('./models/Conversation');
 const { setSocketServer } = require('./utils/socket');
 const { normalizeId } = require('./utils/chat');
+require('dotenv').config();
 
 dotenv.config();
 
